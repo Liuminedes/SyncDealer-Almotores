@@ -1,0 +1,36 @@
+Necesito desarrollar una plataforma de Comisiones para asesores comerciales de 4 marcas (KIA, Renault, Volkswagen y Jac/Jetour). Por ahora vamos a empezar por KIA, quiero desarrollar una plataforma web que sea capaz de hacer todo esto, el proceso tiene que ser que cada 15 de cada mes, se tomen las comisiones del todas las ventas del mes pasado completo, luego te lo planteo de una mejor forma. Las condiciones o requerimientos que tengo son los siguientes:
+▪️Para el funcionamiento de la plataforma:
+1. La plataforma deberá de tener perfileria para manejar el proceso de las comisiones, es decir: Administrador, Asistente de Ventas, Gerente de Marca, Director comercial. Luego te daré el detalle mas especifico de los permisos de cada perfil.
+2. La plataforma solo deberá de permitir realizar las comisiones por parte del asistente de ventas ya que solo será enfocada a comisiones de asesores comerciales KIA, próximamente lo expandiremos a las demás marcas y ya luego a otras cosas.
+3. La plataforma solo deberá de permitir realizar revisiones de TODAS las comisiones por todos los perfiles, menos el de asesor comercial, ese solo podrá ver su historial de comisiones (Si puedes plantear mejor este punto te lo agradezco)
+4. La plataforma deberá de tener una opción para hacer comisiones individuales, grupales o masivas, es decir, individuales cuando es por 1 asesor en especifico (digamos que se generó pero hay que corregir algo entonces que pueda permitir generar solo esa), grupales es comisiones por sede (Norte, 39 o pasoancho) y masivas son todas las comisiones de todos los asesores de una marca, por ahora KIA.
+5. La plataforma deberá de dar la opción de editar el rango de ventas en cada marca a la hora de comisionar, por ahora al ser KIA se trabajan con 3 tablas (Tabla 1 - ventas de 1 a 4 carros, Tabla 2 - ventas de 5 a 6 carros, Tabla 3 - ventas de 7 carros en adelante), esto quiere decir que la comisión funcionará es que si el asesor vende la cantidad de carros de tabla 1, todos los carros que vendió se sumaran con el valor de tabla 1, si vendió la cantidad de carros de tabla 2, lo mismo, se asignará el valor a cada carro con el valor que tiene la tabla 2.
+Un ejemplo más grafico es por ejemplo esto:
+			1-4 Unidades	5- Unidades	7 Unidades
+CODIGO	MODELO	VERSION	TABLA 1	TABLA 2	TABLA 3
+JA3M20__25G1000	NEW PICANTO	VIBRANT	$ 238.146	$ 277.837	$ 317.528
+JA3M45__25G1200	NEW PICANTO	ZENITH	$ 255.469	$ 298.047	$ 340.625
+Si el asesor vendió 4 veces el Picanto Vibrant, se sumará 4 veces el valor que está en tabla 1 del Picanto vibrant, si vendió más de 5 pincantos zenith será el valor de tabla 2 del Picanto zenith, y lo mismo para tabla 3 si vende más de 7 carros. También incluye si vende diferentes carros, la idea es que se apegue la cantidad de carros, busque la referencia y sume lo que corresponde en el total.
+
+6. La plataforma deberá de tener una tabla en la base de datos respectiva para cada sección, 1 para usuarios, otro para la tabla de base de comisiones donde está la referencia, modelo, versión y tablas, otra para el histórico de las comisiones, y la que encuentres adicional ya habiendo dicho todo pues la especificas y miramos si la agregamos o no. Necesito que me des el detalle al 100% de una base de datos sólida y consisa para todo este proceso de comisiones teniendo en cuenta todo, si lo puedes mejorar a uno más robusto, entendible y fácil de adaptar para cuando integremos las otras marcas. Si o si debemos de seguir esa estructura de la base de datos al 100%, nada de cambios, nada de agregar tablas alternas, la que tu plantees tiene que ser la versión final e ideal
+7. La plataforma deberá de tener la opción de generar un PDF siempre y cuando ya estén aprobados por los asesores verificando que esté todo OK, y que pueda ilustrar los datos de comisión que se le va a pagar al asesor, con sus datos (Nombre, cedula, sede, cargo), un resumen de los carros vendidos en una tabla con su valor a pagar (Es decir que tendrá en una ultima columna el valor correspondiente a la cantidad de carros vendidos como te lo expliqué en el punto 5), una sumatoria total de lo que vendió y todos estos datos deberán de ser guardados en una tabla de la base de datos a modo de histórico, en el caso de que se requiera descargar nuevamente, si hay mas datos triviales me lo mencionas.
+8. La plataforma deberá de tener un CRUD para usuarios, un CRUD para la tabla de los carros, en el caso de que se quieran modificar, crear, eliminar o consultar un usuario o vehiculo en la base de comisiones. Añade algo adicional de ser requerido y que no lo haya contemplado.
+9. Dependiendo de la marca que se le asigne a cada persona dentro de la plataforma, entrará a su modulo, es decir, si es de a marca kia solamente mostrará cosas de kia y los pdf saldrán con la marca kia, si son de Volkswagen, JAC/Jetour o Renault también aplica lo mismo, tiene que haber esta estructura para que no se confundan las comisiones y haya orden entre las secciones de marca. Se hace excepción al perfil de administrador ya que este tiene acceso a todos los módulos y deberá de conocer todo, si es asistente, gerente o director si se le aplica esta configuración de que solo accede a la marca asignada (Se podría hacer un checkbox de las marcas en el crud de los usuarios y asi habilitarles los modulos si se checkea o no kia, Renault, volkwagen o jac/jetour). Planteaa mejor esta idea vale?
+
+Por ahora sería eso por parte del funcionamiento de la plataforma, si se me escapa algo que deba de tener o si puedes mejorar mucho más la idea para algo más completo, mencionalo.
+
+▪️Por parte de la tecnología en el Frontend sería:
+1. ReactJS con vite
+2. Material UI
+3. TailwindCSS
+4. Framer-motion
+5. Zustand
+Si hay alguna tecnología mas la añadimos
+
+▪️Por parte de la tecnología en el Backend sería:
+1. NodeJS
+2. Express
+3. MySQL - XAMPP
+Si hay alguna tecnología mas la añadimos
+
+Por ahora sería eso, no se que más hace falta por el planteamiento del proyecto o las tecnologías del back y frontend, dame unos detalles para poder mejorar todo esto en el caso de que veas cosas a mejorar. Me gustaría que complementes mi idea replanteándola y mejorándola a un nivel de desarrollador senior profesional especializado en el desarrollo de plataformas web. También dame un nombre adecuado, la organización se llama Almotores.
