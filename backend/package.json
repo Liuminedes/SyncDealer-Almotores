@@ -1,4 +1,13 @@
 {
+  "type": "module",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "db:migrate": "npx sequelize-cli db:migrate --env development --config src/config/db.js --migrations-path src/migrations",
+    "db:migrate:undo": "npx sequelize-cli db:migrate:undo --env development --config src/config/db.js --migrations-path src/migrations",
+    "db:seed": "npx sequelize-cli db:seed:all --env development --config src/config/db.js --seeders-path src/seeders",
+    "db:seed:undo": "npx sequelize-cli db:seed:undo:all --env development --config src/config/db.js --seeders-path src/seeders"
+  },
   "dependencies": {
     "archiver": "^7.0.1",
     "bcryptjs": "^3.0.3",
@@ -16,5 +25,9 @@
     "sequelize": "^6.37.7",
     "winston": "^3.19.0",
     "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11",
+    "sequelize-cli": "^6.6.5"
   }
 }
