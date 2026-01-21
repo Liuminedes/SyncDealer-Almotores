@@ -13,10 +13,16 @@ import "./styles/index.css";
 import { router } from "./app/router";
 import { getMuiTheme } from "./theme/muiTheme";
 import { useUiStore } from "./app/store/ui.store";
+import { useAuthStore } from "./app/store/auth.store"; // 👈 agrega esto
 
 function AppProviders() {
   const { themeMode } = useUiStore();
   const theme = React.useMemo(() => getMuiTheme(themeMode), [themeMode]);
+
+  const initAuth = useAuthStore((s) => s.init); // 👈
+  React.useEffect(() => {
+    initAuth(); // 👈 reinyecta token en axios + trae /auth/me
+  }, [initAuth]);
 
   return (
     <ThemeProvider theme={theme}>
