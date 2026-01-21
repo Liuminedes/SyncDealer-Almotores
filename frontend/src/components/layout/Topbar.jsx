@@ -43,35 +43,34 @@ export default function Topbar() {
 
   const pageTitle = useMemo(
     () => titleByPath(location.pathname),
-    [location.pathname]
+    [location.pathname],
   );
 
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
-
-  const subTitle = "Sync Dealer Almotores · Beta v1.0";
 
   return (
     <AppBar
       position="fixed"
       elevation={0}
       sx={{
-        width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
-        ml: { md: `${DRAWER_WIDTH}px` },
-        borderBottom: `1px solid ${theme.palette.divider}`,
-        bgcolor: alpha(theme.palette.background.paper, theme.palette.mode === "dark" ? 0.75 : 0.85),
-        backdropFilter: "blur(10px)",
-        backgroundImage: "none",
+        // ✅ Esto es lo que te falta
+        width: { xs: "100%", md: `calc(100% - ${DRAWER_WIDTH}px)` },
+        ml: { xs: 0, md: `${DRAWER_WIDTH}px` },
       }}
     >
-      <Toolbar sx={{ display: "flex", justifyContent: "space-between" }}>
+      <Toolbar
+        disableGutters
+        sx={{
+          px: { xs: 2, md: 3 },
+          display: "flex",
+          justifyContent: "space-between",
+        }}
+      >
         {/* Left */}
         <Box>
           <Typography sx={{ fontWeight: 900, lineHeight: 1 }}>
             {pageTitle}
-          </Typography>
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            {subTitle}
           </Typography>
         </Box>
 

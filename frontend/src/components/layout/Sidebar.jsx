@@ -25,11 +25,28 @@ import { DRAWER_WIDTH } from "./MainLayout";
 
 const nav = [
   { label: "Dashboard", to: "/dashboard", icon: <HomeRoundedIcon /> },
-  { label: "Usuarios", to: "/users", icon: <PeopleAltRoundedIcon />, adminOnly: true },
+  {
+    label: "Usuarios",
+    to: "/users",
+    icon: <PeopleAltRoundedIcon />,
+    adminOnly: true,
+  },
   { label: "Ventas", to: "/sales", icon: <SellRoundedIcon /> },
-  { label: "Comisiones", to: "/commissions/runs", icon: <PaymentsRoundedIcon /> },
-  { label: "Statements", to: "/commissions/statements", icon: <DescriptionRoundedIcon /> },
-  { label: "Exportaciones", to: "/reports/exports", icon: <FileDownloadRoundedIcon /> },
+  {
+    label: "Comisiones",
+    to: "/commissions/runs",
+    icon: <PaymentsRoundedIcon />,
+  },
+  {
+    label: "Statements",
+    to: "/commissions/statements",
+    icon: <DescriptionRoundedIcon />,
+  },
+  {
+    label: "Exportaciones",
+    to: "/reports/exports",
+    icon: <FileDownloadRoundedIcon />,
+  },
 ];
 
 export default function Sidebar() {
@@ -52,6 +69,8 @@ export default function Sidebar() {
           borderRight: `1px solid ${theme.palette.divider}`,
           bgcolor: "background.paper",
           backgroundImage: "none",
+          left: 0,
+          top: 0,
         },
       }}
     >
@@ -95,10 +114,19 @@ export default function Sidebar() {
         <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
           <Chip size="small" label={user?.role || "—"} />
           {user?.brands?.slice(0, 2)?.map((b) => (
-            <Chip key={b.brand_id} size="small" label={b.code} variant="outlined" />
+            <Chip
+              key={b.brand_id}
+              size="small"
+              label={b.code}
+              variant="outlined"
+            />
           ))}
           {(user?.brands?.length || 0) > 2 && (
-            <Chip size="small" label={`+${user.brands.length - 2}`} variant="outlined" />
+            <Chip
+              size="small"
+              label={`+${user.brands.length - 2}`}
+              variant="outlined"
+            />
           )}
         </Box>
       </Box>
@@ -130,7 +158,10 @@ export default function Sidebar() {
                   "&:hover": {
                     bgcolor: active
                       ? alpha(theme.palette.primary.main, 0.16)
-                      : alpha(theme.palette.text.primary, theme.palette.mode === "dark" ? 0.05 : 0.04),
+                      : alpha(
+                          theme.palette.text.primary,
+                          theme.palette.mode === "dark" ? 0.05 : 0.04,
+                        ),
                     color: "text.primary",
                   },
                 }}

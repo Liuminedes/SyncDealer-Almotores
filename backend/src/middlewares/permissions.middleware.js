@@ -1,6 +1,22 @@
 import { sequelize } from "../config/db.js";
 import { HttpError } from "../utils/httpError.js";
 
+// ✅ Roles (ADMIN, etc.)
+export function requireRole(...roles) {
+  return (req, res, next) => {
+    const user = req.user;
+    if (!user?.role) return next(new HttpError(401, "No autenticado"));
+
+    const allowed = roles.map((r) => String(r).toUpperCase());
+    const current = String(user.role).toUpperCase();
+
+    if (!allowed.includes(current)) {
+      return next(new HttpError(403, "No autorizado"));
+    }
+    next();
+  };
+}
+
 // action: "view" | "generate"
 export function requireBrandPermission(action, getBrandCodeFromReq) {
   return async (req, res, next) => {
@@ -11,8 +27,8 @@ export function requireBrandPermission(action, getBrandCodeFromReq) {
       const brandCode = (getBrandCodeFromReq?.(req) || "").toUpperCase();
       if (!brandCode) throw new HttpError(400, "Marca requerida");
 
-      // Admin: si quieres bypass total, descomenta esto.
-      // if (user.role === "ADMIN") return next();
+      // Admin bypass (si lo quieres)
+      // if (String(user.role).toUpperCase() === "ADMIN") return next();
 
       const [rows] = await sequelize.query(
         `
@@ -35,7 +51,12 @@ export function requireBrandPermission(action, getBrandCodeFromReq) {
         throw new HttpError(403, "Sin permiso de generación para esta marca");
       }
 
-      req.brand = { code: brandCode, can_view: !!access.can_view, can_generate: !!access.can_generate };
+      req.brand = {
+        code: brandCode,
+        can_view: !!access.can_view,
+        can_generate: !!access.can_generate,
+      };
+
       next();
     } catch (err) {
       next(err);
