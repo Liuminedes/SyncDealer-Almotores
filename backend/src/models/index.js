@@ -6,6 +6,10 @@ import Brand from "./Brand.js";
 import Branch from "./Branch.js";
 import UserBrandAccess from "./UserBrandAccess.js";
 
+// 🆕 Sprint 5
+import Vehicle from "./Vehicle.js";
+import Sale from "./Sale.js";
+
 // ===== Associations =====
 
 // Role <-> User
@@ -32,4 +36,35 @@ Brand.belongsToMany(User, {
 UserBrandAccess.belongsTo(User, { as: "user", foreignKey: "user_id" });
 UserBrandAccess.belongsTo(Brand, { as: "brand", foreignKey: "brand_id" });
 
-export { sequelize, User, Role, Brand, Branch, UserBrandAccess };
+// ============================
+// ✅ Sprint 5: Vehicles & Sales
+// ============================
+
+// Brand <-> Vehicle
+Vehicle.belongsTo(Brand, { as: "brand", foreignKey: "brand_id" });
+Brand.hasMany(Vehicle, { as: "vehicles", foreignKey: "brand_id" });
+
+// Sales relations
+Sale.belongsTo(Brand, { as: "brand", foreignKey: "brand_id" });
+Brand.hasMany(Sale, { as: "sales", foreignKey: "brand_id" });
+
+Sale.belongsTo(User, { as: "advisor", foreignKey: "advisor_id" });
+User.hasMany(Sale, { as: "sales", foreignKey: "advisor_id" });
+
+Sale.belongsTo(Vehicle, { as: "vehicle", foreignKey: "vehicle_id" });
+Vehicle.hasMany(Sale, { as: "sales", foreignKey: "vehicle_id" });
+
+// (Opcional pero útil) quien creó el registro
+Sale.belongsTo(User, { as: "createdBy", foreignKey: "created_by" });
+
+export {
+  sequelize,
+  User,
+  Role,
+  Brand,
+  Branch,
+  UserBrandAccess,
+  // Sprint 5
+  Vehicle,
+  Sale,
+};
