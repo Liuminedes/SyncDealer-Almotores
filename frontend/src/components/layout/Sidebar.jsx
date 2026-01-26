@@ -19,42 +19,93 @@ import SellRoundedIcon from "@mui/icons-material/SellRounded";
 import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
+import DirectionsCarRoundedIcon from "@mui/icons-material/DirectionsCarRounded";
 
 import { useAuthStore } from "../../app/store/auth.store";
 import { DRAWER_WIDTH } from "./MainLayout";
 
-const nav = [
-  { label: "Dashboard", to: "/dashboard", icon: <HomeRoundedIcon /> },
+const navSections = [
   {
-    label: "Usuarios",
-    to: "/users",
-    icon: <PeopleAltRoundedIcon />,
-    adminOnly: true,
-  },
-  { label: "Ventas", to: "/sales", icon: <SellRoundedIcon /> },
-  {
-    label: "Comisiones",
-    to: "/commissions/runs",
-    icon: <PaymentsRoundedIcon />,
+    title: "Inicio",
+    items: [{ label: "Dashboard", to: "/dashboard", icon: <HomeRoundedIcon /> }],
   },
   {
-    label: "Statements",
-    to: "/commissions/statements",
-    icon: <DescriptionRoundedIcon />,
+    title: "Gestión",
+    items: [
+      {
+        label: "Usuarios",
+        to: "/users",
+        icon: <PeopleAltRoundedIcon />,
+        adminOnly: true,
+      },
+      {
+        label: "Vehículos",
+        to: "/vehicles",
+        icon: <DirectionsCarRoundedIcon />,
+      },
+      {
+        label: "Ventas",
+        to: "/sales",
+        icon: <SellRoundedIcon />,
+      },
+    ],
   },
   {
-    label: "Exportaciones",
-    to: "/reports/exports",
-    icon: <FileDownloadRoundedIcon />,
+    title: "Comisiones",
+    items: [
+      {
+        label: "Comisiones",
+        to: "/commissions/runs",
+        icon: <PaymentsRoundedIcon />,
+      },
+      {
+        label: "Statements",
+        to: "/commissions/statements",
+        icon: <DescriptionRoundedIcon />,
+      },
+    ],
+  },
+  {
+    title: "Reportes",
+    items: [
+      {
+        label: "Exportaciones",
+        to: "/reports/exports",
+        icon: <FileDownloadRoundedIcon />,
+      },
+    ],
   },
 ];
+
+function SectionTitle({ children }) {
+  return (
+    <Typography
+      variant="caption"
+      sx={{
+        px: 2,
+        pt: 1.5,
+        pb: 0.75,
+        color: "text.secondary",
+        fontWeight: 900,
+        letterSpacing: 0.8,
+        textTransform: "uppercase",
+      }}
+    >
+      {children}
+    </Typography>
+  );
+}
 
 export default function Sidebar() {
   const theme = useTheme();
   const { user } = useAuthStore();
   const location = useLocation();
 
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = String(user?.role || "").toUpperCase() === "ADMIN";
+
+  // ✅ Activo inteligente: soporta rutas hijas
+  const isActivePath = (to) =>
+    location.pathname === to || location.pathname.startsWith(`${to}/`);
 
   return (
     <Drawer
@@ -79,8 +130,8 @@ export default function Sidebar() {
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
           <Box
             sx={{
-              width: 34,
-              height: 34,
+              width: 36,
+              height: 36,
               borderRadius: 2,
               bgcolor: "primary.main",
               display: "grid",
@@ -106,13 +157,34 @@ export default function Sidebar() {
 
       <Divider />
 
-      {/* Session chips (opcional, pero ya bien en light/dark) */}
+      {/* Session */}
       <Box sx={{ px: 2, py: 1.5 }}>
-        <Typography variant="caption" sx={{ color: "text.secondary" }}>
-          Sesión
-        </Typography>
+        <StackLikeRow>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            Sesión
+          </Typography>
+
+          {/* mini indicador */}
+          <Chip
+            size="small"
+            label={user?.is_active === false ? "Bloqueado" : "Activa"}
+            sx={{
+              ml: "auto",
+              fontWeight: 900,
+              bgcolor:
+                user?.is_active === false
+                  ? alpha(theme.palette.error.main, 0.14)
+                  : alpha(theme.palette.success.main, 0.14),
+              color:
+                user?.is_active === false
+                  ? theme.palette.error.main
+                  : theme.palette.success.main,
+            }}
+          />
+        </StackLikeRow>
+
         <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
-          <Chip size="small" label={user?.role || "—"} />
+          <Chip size="small" label={user?.role || "—"} sx={{ fontWeight: 900 }} />
           {user?.brands?.slice(0, 2)?.map((b) => (
             <Chip
               key={b.brand_id}
@@ -133,64 +205,92 @@ export default function Sidebar() {
 
       <Divider />
 
-      {/* Nav */}
-      <List sx={{ px: 1, py: 1 }}>
-        {nav
-          .filter((i) => (i.adminOnly ? isAdmin : true))
-          .map((item) => {
-            const active = location.pathname === item.to;
+      {/* Nav Sections */}
+      <Box sx={{ py: 1 }}>
+        {navSections.map((section) => {
+          const visibleItems = section.items.filter((i) =>
+            i.adminOnly ? isAdmin : true
+          );
 
-            return (
-              <ListItemButton
-                key={item.to}
-                component={NavLink}
-                to={item.to}
-                sx={{
-                  my: 0.5,
-                  borderRadius: 2,
-                  border: `1px solid transparent`,
-                  color: active ? "text.primary" : "text.secondary",
-                  ...(active && {
-                    bgcolor: alpha(theme.palette.primary.main, 0.12),
-                    borderColor: alpha(theme.palette.primary.main, 0.28),
-                    color: "text.primary",
-                  }),
-                  "&:hover": {
-                    bgcolor: active
-                      ? alpha(theme.palette.primary.main, 0.16)
-                      : alpha(
-                          theme.palette.text.primary,
-                          theme.palette.mode === "dark" ? 0.05 : 0.04,
-                        ),
-                    color: "text.primary",
-                  },
-                }}
-              >
-                <ListItemIcon
-                  sx={{
-                    minWidth: 40,
-                    color: active ? "primary.main" : "text.secondary",
-                  }}
-                >
-                  {item.icon}
-                </ListItemIcon>
+          if (!visibleItems.length) return null;
 
-                <ListItemText
-                  primary={item.label}
-                  primaryTypographyProps={{ fontWeight: active ? 900 : 600 }}
-                />
-              </ListItemButton>
-            );
-          })}
-      </List>
+          return (
+            <Box key={section.title} sx={{ mb: 0.75 }}>
+              <SectionTitle>{section.title}</SectionTitle>
+
+              <List sx={{ px: 1, py: 0 }}>
+                {visibleItems.map((item) => {
+                  const active = isActivePath(item.to);
+
+                  return (
+                    <ListItemButton
+                      key={item.to}
+                      component={NavLink}
+                      to={item.to}
+                      sx={{
+                        my: 0.5,
+                        borderRadius: 2,
+                        border: `1px solid transparent`,
+                        color: active ? "text.primary" : "text.secondary",
+                        ...(active && {
+                          bgcolor: alpha(theme.palette.primary.main, 0.12),
+                          borderColor: alpha(theme.palette.primary.main, 0.28),
+                          color: "text.primary",
+                        }),
+                        "&:hover": {
+                          bgcolor: active
+                            ? alpha(theme.palette.primary.main, 0.16)
+                            : alpha(
+                                theme.palette.text.primary,
+                                theme.palette.mode === "dark" ? 0.05 : 0.04
+                              ),
+                          color: "text.primary",
+                        },
+                      }}
+                    >
+                      <ListItemIcon
+                        sx={{
+                          minWidth: 40,
+                          color: active ? "primary.main" : "text.secondary",
+                        }}
+                      >
+                        {item.icon}
+                      </ListItemIcon>
+
+                      <ListItemText
+                        primary={item.label}
+                        primaryTypographyProps={{
+                          fontWeight: active ? 900 : 600,
+                        }}
+                      />
+                    </ListItemButton>
+                  );
+                })}
+              </List>
+
+              <Divider sx={{ mt: 1 }} />
+            </Box>
+          );
+        })}
+      </Box>
 
       <Box sx={{ flexGrow: 1 }} />
 
+      {/* Footer */}
       <Box sx={{ p: 2 }}>
         <Typography variant="caption" sx={{ color: "text.secondary" }}>
           Beta v1.0
         </Typography>
       </Box>
     </Drawer>
+  );
+}
+
+/** mini helper para alinear caption + chip */
+function StackLikeRow({ children }) {
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      {children}
+    </Box>
   );
 }

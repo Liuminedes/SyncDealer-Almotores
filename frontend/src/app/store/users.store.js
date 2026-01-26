@@ -67,7 +67,7 @@ export const useUsersStore = create((set, get) => ({
       const [rolesRes, brandsRes] = await Promise.all([rolesApi.list(), brandsApi.list()]);
       set({
         roles: rolesRes?.data || [],
-        brands: brandsRes?.data || [],
+        brands: brandsRes || [],
       });
     } catch {
       set({ roles: [], brands: [] });

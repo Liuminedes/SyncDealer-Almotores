@@ -6,6 +6,7 @@ import ProtectedRoute from "../components/layout/ProtectedRoute";
 import Login from "../pages/auth/Login";
 import Dashboard from "../pages/dashboard/Dashboard";
 import Users from "../pages/users/Users";
+import Vehicles from "../pages/vehicles/Vehicles";
 import Sales from "../pages/sales/Sales";
 import Runs from "../pages/commissions/Runs";
 import RunDetail from "../pages/commissions/RunDetail";
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "/dashboard", element: <Dashboard /> },
       { path: "/users", element: <Users /> },
+      { path: "/vehicles", element: <Vehicles /> },
       { path: "/sales", element: <Sales /> },
 
       { path: "/commissions/runs", element: <Runs /> },
