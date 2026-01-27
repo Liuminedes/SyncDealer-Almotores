@@ -17,8 +17,8 @@ export const getMuiTheme = (mode = "dark") => {
   const base = createTheme({
     palette: {
       mode,
-      primary: { main: "#7C3AED" }, // morado corporativo
-      secondary: { main: "#06B6D4" }, // acento
+      primary: { main: "#3aeda8" }, // morado corporativo
+      secondary: { main: "#06d48f" }, // acento
       background: {
         default: isDark ? "#0B0B10" : "#F6F7FB",
         paper: isDark ? "#11111A" : "#FFFFFF",
@@ -158,7 +158,7 @@ export const getMuiTheme = (mode = "dark") => {
             borderRadius: 999,
           },
           contained: {
-            boxShadow: `0 12px 26px ${alpha("#7C3AED", 0.24)}`,
+            boxShadow: `0 12px 26px ${alpha("#3aeda8", 0.24)}`,
           },
         },
       },

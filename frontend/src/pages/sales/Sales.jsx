@@ -30,6 +30,24 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 
 import { useSalesStore } from "../../app/store/sales.store";
 
+export const MONTHS = [
+  { value: 1, label: "Enero" },
+  { value: 2, label: "Febrero" },
+  { value: 3, label: "Marzo" },
+  { value: 4, label: "Abril" },
+  { value: 5, label: "Mayo" },
+  { value: 6, label: "Junio" },
+  { value: 7, label: "Julio" },
+  { value: 8, label: "Agosto" },
+  { value: 9, label: "Septiembre" },
+  { value: 10, label: "Octubre" },
+  { value: 11, label: "Noviembre" },
+  { value: 12, label: "Diciembre" },
+];
+
+const getMonthName = (month) =>
+  MONTHS.find((m) => m.value === Number(month))?.label ?? "Mes inválido";
+
 export default function Sales() {
   const {
     items,
@@ -98,7 +116,11 @@ export default function Sales() {
     <Box sx={{ width: "100%" }}>
       <Stack spacing={2}>
         {/* Header */}
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+        >
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 900 }}>
               Ventas
@@ -226,16 +248,26 @@ export default function Sales() {
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={7}>
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 2 }}>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        sx={{ py: 2 }}
+                      >
                         <CircularProgress size={18} />
-                        <Typography variant="body2">Cargando ventas…</Typography>
+                        <Typography variant="body2">
+                          Cargando ventas…
+                        </Typography>
                       </Stack>
                     </TableCell>
                   </TableRow>
                 ) : items.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7}>
-                      <Typography variant="body2" sx={{ py: 2, color: "text.secondary" }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ py: 2, color: "text.secondary" }}
+                      >
                         No hay ventas para mostrar.
                       </Typography>
                     </TableCell>
@@ -244,7 +276,9 @@ export default function Sales() {
                   items.map((s) => (
                     <TableRow key={s.id} hover>
                       <TableCell>
-                        <Typography variant="body2">{s.sale_date || "—"}</Typography>
+                        <Typography variant="body2">
+                          {s.sale_date || "—"}
+                        </Typography>
                       </TableCell>
 
                       <TableCell>
@@ -254,11 +288,15 @@ export default function Sales() {
                       </TableCell>
 
                       <TableCell>
-                        <Typography variant="body2">{s.client_name || "—"}</Typography>
+                        <Typography variant="body2">
+                          {s.client_name || "—"}
+                        </Typography>
                       </TableCell>
 
                       <TableCell>
-                        <Typography variant="body2">{s.plate || "—"}</Typography>
+                        <Typography variant="body2">
+                          {s.plate || "—"}
+                        </Typography>
                       </TableCell>
 
                       <TableCell>
@@ -267,7 +305,10 @@ export default function Sales() {
                             ? `${s.vehicle.model} ${s.vehicle.version || ""}`.trim()
                             : "—"}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "text.secondary" }}
+                        >
                           {s.vehicle?.code || ""}
                         </Typography>
                       </TableCell>
@@ -276,19 +317,27 @@ export default function Sales() {
                         <Typography variant="body2">
                           {s.advisor?.full_name || "—"}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "text.secondary" }}
+                        >
                           {s.advisor?.email || ""}
                         </Typography>
                       </TableCell>
 
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 900 }}>
-                          {s.cut_month ? `Mes ${s.cut_month}` : "—"}{" "}
-                          {s.fortnight ? `(${s.fortnight === "FIRST" ? "1ra" : "2da"})` : ""}
+                          {s.cut_month ? getMonthName(s.cut_month) : "—"}{" "}
+                          {s.fortnight
+                            ? `(${s.fortnight === "FIRST" ? "1ra quincena" : "2da quincena"})`
+                            : ""}
                         </Typography>
                         {s.charge_month ? (
-                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                            Cobro: mes {s.charge_month}
+                          <Typography
+                            variant="caption"
+                            sx={{ color: "text.secondary" }}
+                          >
+                            Cobro: {getMonthName(s.charge_month)}
                           </Typography>
                         ) : null}
                       </TableCell>
@@ -329,7 +378,12 @@ export default function Sales() {
 
         <DialogContent dividers>
           {!formSale ? (
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 2 }}>
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ py: 2 }}
+            >
               <CircularProgress size={18} />
               <Typography variant="body2">Cargando…</Typography>
             </Stack>
@@ -394,30 +448,34 @@ export default function Sales() {
 
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
                 <TextField
-                  label="Mes corte (1-12)"
+                  label="Mes de corte (Enero – Diciembre)"
                   type="number"
                   value={formSale.cut_month ?? ""}
                   onChange={(e) => setFormSale({ cut_month: e.target.value })}
                   fullWidth
+                  inputProps={{ min: 1, max: 12 }}
                 />
 
                 <TextField
-                  label="Quincena"
+                  label="Quincena de corte"
                   value={formSale.fortnight || "FIRST"}
                   onChange={(e) => setFormSale({ fortnight: e.target.value })}
                   select
                   fullWidth
                 >
-                  <MenuItem value="FIRST">Primera</MenuItem>
-                  <MenuItem value="SECOND">Segunda</MenuItem>
+                  <MenuItem value="FIRST">Primera quincena</MenuItem>
+                  <MenuItem value="SECOND">Segunda quincena</MenuItem>
                 </TextField>
 
                 <TextField
-                  label="Mes cobro (opcional)"
+                  label="Mes de cobro (opcional)"
                   type="number"
                   value={formSale.charge_month ?? ""}
-                  onChange={(e) => setFormSale({ charge_month: e.target.value })}
+                  onChange={(e) =>
+                    setFormSale({ charge_month: e.target.value })
+                  }
                   fullWidth
+                  inputProps={{ min: 1, max: 12 }}
                 />
               </Stack>
 

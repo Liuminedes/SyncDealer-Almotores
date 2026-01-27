@@ -66,9 +66,9 @@ export const useSalesStore = create((set, get) => ({
         page:
           patch.page ??
           (patch.q !== undefined ||
-          patch.brand_id !== undefined ||
-          patch.date_from !== undefined ||
-          patch.date_to !== undefined
+            patch.brand_id !== undefined ||
+            patch.date_from !== undefined ||
+            patch.date_to !== undefined
             ? 1
             : s.filters.page),
       },
@@ -123,23 +123,22 @@ export const useSalesStore = create((set, get) => ({
 
   fetchAdvisors: async () => {
     try {
-      // ✅ Asumiendo que tienes usersApi.list({ role: "ADVISOR" }) o similar
-      const res = await usersApi.list({ role: "ADVISOR", limit: 200, page: 1 });
+      const res = await usersApi.list({
+        role: "ADVISOR",
+        limit: 100,
+        page: 1,
+      });
 
-      const root = res?.data ?? res;
-      const payload = root?.data ?? root;
-      const items =
-        payload?.items ||
-        payload?.users ||
-        payload?.rows ||
-        payload?.data ||
-        (Array.isArray(payload) ? payload : []);
+      // 🔥 extracción correcta según tu backend
+      const items = res?.data?.items ?? [];
 
-      set({ advisors: items || [] });
-    } catch {
+      set({ advisors: items });
+    } catch (error) {
+      console.error("Error loading advisors", error);
       set({ advisors: [] });
     }
   },
+
 
   // --- List ---
   fetchSales: async () => {
