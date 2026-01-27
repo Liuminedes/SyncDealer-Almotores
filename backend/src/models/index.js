@@ -6,9 +6,18 @@ import Brand from "./Brand.js";
 import Branch from "./Branch.js";
 import UserBrandAccess from "./UserBrandAccess.js";
 
-// 🆕 Sprint 5
+// ✅ Sprint 5
 import Vehicle from "./Vehicle.js";
 import Sale from "./Sale.js";
+
+// ✅ Sprint 6
+import CommissionRun from "./CommissionRun.js";
+import CommissionStatementItem from "./CommissionStatementItem.js";
+
+// (Reglas existentes) — si luego las conectamos, las importamos.
+// import CommissionScheme from "./CommissionScheme.js";
+// import CommissionTier from "./CommissionTier.js";
+// import CommissionVehicleRate from "./CommissionVehicleRate.js";
 
 // ===== Associations =====
 
@@ -32,7 +41,7 @@ Brand.belongsToMany(User, {
   otherKey: "user_id",
 });
 
-// Join table direct relations (útil para includes / bulk ops)
+// Join table direct relations
 UserBrandAccess.belongsTo(User, { as: "user", foreignKey: "user_id" });
 UserBrandAccess.belongsTo(Brand, { as: "brand", foreignKey: "brand_id" });
 
@@ -54,8 +63,33 @@ User.hasMany(Sale, { as: "sales", foreignKey: "advisor_id" });
 Sale.belongsTo(Vehicle, { as: "vehicle", foreignKey: "vehicle_id" });
 Vehicle.hasMany(Sale, { as: "sales", foreignKey: "vehicle_id" });
 
-// (Opcional pero útil) quien creó el registro
+// Quien creó el registro
 Sale.belongsTo(User, { as: "createdBy", foreignKey: "created_by" });
+
+// ============================
+// ✅ Sprint 6: Commissions
+// ============================
+
+// CommissionRun: cabecera por corte/asesor
+CommissionRun.belongsTo(Brand, { as: "brand", foreignKey: "brand_id" });
+Brand.hasMany(CommissionRun, { as: "commissionRuns", foreignKey: "brand_id" });
+
+CommissionRun.belongsTo(User, { as: "advisor", foreignKey: "advisor_id" });
+User.hasMany(CommissionRun, { as: "commissionRuns", foreignKey: "advisor_id" });
+
+CommissionRun.belongsTo(User, { as: "createdBy", foreignKey: "created_by" });
+
+// Items del run
+CommissionStatementItem.belongsTo(CommissionRun, { as: "run", foreignKey: "run_id" });
+CommissionRun.hasMany(CommissionStatementItem, { as: "items", foreignKey: "run_id" });
+
+// Link clave: item -> sale (por id de venta)
+CommissionStatementItem.belongsTo(Sale, { as: "sale", foreignKey: "sale_id" });
+Sale.hasMany(CommissionStatementItem, { as: "commissionItems", foreignKey: "sale_id" });
+
+// Para acceso rápido
+CommissionStatementItem.belongsTo(Vehicle, { as: "vehicle", foreignKey: "vehicle_id" });
+Vehicle.hasMany(CommissionStatementItem, { as: "commissionItems", foreignKey: "vehicle_id" });
 
 export {
   sequelize,
@@ -64,7 +98,12 @@ export {
   Brand,
   Branch,
   UserBrandAccess,
+
   // Sprint 5
   Vehicle,
   Sale,
+
+  // Sprint 6
+  CommissionRun,
+  CommissionStatementItem,
 };

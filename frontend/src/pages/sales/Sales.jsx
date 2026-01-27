@@ -30,12 +30,6 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 
 import { useSalesStore } from "../../app/store/sales.store";
 
-const COP = new Intl.NumberFormat("es-CO", {
-  style: "currency",
-  currency: "COP",
-  maximumFractionDigits: 0,
-});
-
 export default function Sales() {
   const {
     items,
@@ -49,14 +43,17 @@ export default function Sales() {
     error,
 
     openForm,
+    formMode,
     formSale,
 
     setFilters,
     resetFilters,
     hydrateMeta,
     fetchSales,
+    fetchVehiclesForBrand,
 
     openCreate,
+    openEdit, // (por si luego agregas editar en la tabla)
     closeForm,
     setFormSale,
     submitForm,
@@ -82,6 +79,21 @@ export default function Sales() {
     if (e.key === "Enter") handleSearch();
   };
 
+  // ✅ Cambio de marca en filtros => recarga vehículos (para el modal) + lista
+  const handleFilterBrandChange = async (value) => {
+    setFilters({ brand_id: value, page: 1 });
+    await fetchVehiclesForBrand();
+    await fetchSales();
+  };
+
+  // ✅ Cambio de marca en el MODAL => recarga vehículos también
+  const handleFormBrandChange = async (value) => {
+    setFormSale({ brand_id: Number(value), vehicle_id: "" });
+    // sincroniza filtro de marca (opcional pero recomendado)
+    setFilters({ brand_id: String(value) });
+    await fetchVehiclesForBrand();
+  };
+
   return (
     <Box sx={{ width: "100%" }}>
       <Stack spacing={2}>
@@ -92,7 +104,7 @@ export default function Sales() {
               Ventas
             </Typography>
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Registro de ventas + comisión (Sprint 5)
+              Registro manual de ventas (Sprint 5)
             </Typography>
           </Box>
 
@@ -140,7 +152,7 @@ export default function Sales() {
             <TextField
               label="Marca"
               value={filters.brand_id}
-              onChange={(e) => setFilters({ brand_id: e.target.value })}
+              onChange={(e) => handleFilterBrandChange(e.target.value)}
               size="small"
               select
               sx={{ minWidth: 200 }}
@@ -155,8 +167,8 @@ export default function Sales() {
             <TextField
               label="Desde"
               type="date"
-              value={filters.from}
-              onChange={(e) => setFilters({ from: e.target.value })}
+              value={filters.date_from || ""}
+              onChange={(e) => setFilters({ date_from: e.target.value })}
               size="small"
               InputLabelProps={{ shrink: true }}
               sx={{ minWidth: 160 }}
@@ -165,8 +177,8 @@ export default function Sales() {
             <TextField
               label="Hasta"
               type="date"
-              value={filters.to}
-              onChange={(e) => setFilters({ to: e.target.value })}
+              value={filters.date_to || ""}
+              onChange={(e) => setFilters({ date_to: e.target.value })}
               size="small"
               InputLabelProps={{ shrink: true }}
               sx={{ minWidth: 160 }}
@@ -176,6 +188,7 @@ export default function Sales() {
               variant="outlined"
               onClick={async () => {
                 resetFilters();
+                await fetchVehiclesForBrand();
                 await fetchSales();
               }}
               sx={{ borderRadius: 2 }}
@@ -204,8 +217,8 @@ export default function Sales() {
                   <TableCell sx={{ fontWeight: 900 }}>Cliente</TableCell>
                   <TableCell sx={{ fontWeight: 900 }}>Placa</TableCell>
                   <TableCell sx={{ fontWeight: 900 }}>Vehículo</TableCell>
-                  <TableCell sx={{ fontWeight: 900 }}>Tabla</TableCell>
-                  <TableCell sx={{ fontWeight: 900 }}>Comisión</TableCell>
+                  <TableCell sx={{ fontWeight: 900 }}>Asesor</TableCell>
+                  <TableCell sx={{ fontWeight: 900 }}>Corte</TableCell>
                 </TableRow>
               </TableHead>
 
@@ -233,34 +246,51 @@ export default function Sales() {
                       <TableCell>
                         <Typography variant="body2">{s.sale_date || "—"}</Typography>
                       </TableCell>
+
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 900 }}>
                           {s.invoice || "—"}
                         </Typography>
                       </TableCell>
+
                       <TableCell>
-                        <Typography variant="body2">{s.client_name}</Typography>
+                        <Typography variant="body2">{s.client_name || "—"}</Typography>
                       </TableCell>
+
                       <TableCell>
                         <Typography variant="body2">{s.plate || "—"}</Typography>
                       </TableCell>
+
                       <TableCell>
                         <Typography variant="body2">
-                          {s.vehicle?.model ? `${s.vehicle.model} ${s.vehicle.version}` : "—"}
+                          {s.vehicle?.model
+                            ? `${s.vehicle.model} ${s.vehicle.version || ""}`.trim()
+                            : "—"}
                         </Typography>
                         <Typography variant="caption" sx={{ color: "text.secondary" }}>
                           {s.vehicle?.code || ""}
                         </Typography>
                       </TableCell>
+
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 900 }}>
-                          {s.tier_used ? `Tabla ${s.tier_used}` : "—"}
+                        <Typography variant="body2">
+                          {s.advisor?.full_name || "—"}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                          {s.advisor?.email || ""}
                         </Typography>
                       </TableCell>
+
                       <TableCell>
                         <Typography variant="body2" sx={{ fontWeight: 900 }}>
-                          {COP.format(Number(s.commission_value || 0))}
+                          {s.cut_month ? `Mes ${s.cut_month}` : "—"}{" "}
+                          {s.fortnight ? `(${s.fortnight === "FIRST" ? "1ra" : "2da"})` : ""}
                         </Typography>
+                        {s.charge_month ? (
+                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                            Cobro: mes {s.charge_month}
+                          </Typography>
+                        ) : null}
                       </TableCell>
                     </TableRow>
                   ))
@@ -290,10 +320,12 @@ export default function Sales() {
       </Stack>
 
       {/* =========================
-          Dialog: Create Sale
+          Dialog: Create / Edit Sale
          ========================= */}
       <Dialog open={openForm} onClose={closeForm} fullWidth maxWidth="md">
-        <DialogTitle sx={{ fontWeight: 900 }}>Nueva venta</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 900 }}>
+          {formMode === "edit" ? "Editar venta" : "Nueva venta"}
+        </DialogTitle>
 
         <DialogContent dividers>
           {!formSale ? (
@@ -307,7 +339,7 @@ export default function Sales() {
                 <TextField
                   label="Marca"
                   value={String(formSale.brand_id ?? 6)}
-                  onChange={(e) => setFormSale({ brand_id: Number(e.target.value) })}
+                  onChange={(e) => handleFormBrandChange(e.target.value)}
                   select
                   fullWidth
                 >
@@ -320,7 +352,7 @@ export default function Sales() {
 
                 <TextField
                   label="Asesor"
-                  value={formSale.advisor_id}
+                  value={String(formSale.advisor_id || "")}
                   onChange={(e) => setFormSale({ advisor_id: e.target.value })}
                   select
                   fullWidth
@@ -337,7 +369,7 @@ export default function Sales() {
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
                 <TextField
                   label="Vehículo"
-                  value={formSale.vehicle_id}
+                  value={String(formSale.vehicle_id || "")}
                   onChange={(e) => setFormSale({ vehicle_id: e.target.value })}
                   select
                   fullWidth
@@ -353,7 +385,7 @@ export default function Sales() {
                 <TextField
                   label="Fecha venta"
                   type="date"
-                  value={formSale.sale_date}
+                  value={formSale.sale_date || ""}
                   onChange={(e) => setFormSale({ sale_date: e.target.value })}
                   InputLabelProps={{ shrink: true }}
                   fullWidth
@@ -364,14 +396,14 @@ export default function Sales() {
                 <TextField
                   label="Mes corte (1-12)"
                   type="number"
-                  value={formSale.cut_month}
+                  value={formSale.cut_month ?? ""}
                   onChange={(e) => setFormSale({ cut_month: e.target.value })}
                   fullWidth
                 />
 
                 <TextField
                   label="Quincena"
-                  value={formSale.fortnight}
+                  value={formSale.fortnight || "FIRST"}
                   onChange={(e) => setFormSale({ fortnight: e.target.value })}
                   select
                   fullWidth
@@ -383,7 +415,7 @@ export default function Sales() {
                 <TextField
                   label="Mes cobro (opcional)"
                   type="number"
-                  value={formSale.charge_month}
+                  value={formSale.charge_month ?? ""}
                   onChange={(e) => setFormSale({ charge_month: e.target.value })}
                   fullWidth
                 />
@@ -392,13 +424,13 @@ export default function Sales() {
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
                 <TextField
                   label="Factura"
-                  value={formSale.invoice}
+                  value={formSale.invoice || ""}
                   onChange={(e) => setFormSale({ invoice: e.target.value })}
                   fullWidth
                 />
                 <TextField
                   label="Placa"
-                  value={formSale.plate}
+                  value={formSale.plate || ""}
                   onChange={(e) => setFormSale({ plate: e.target.value })}
                   fullWidth
                 />
@@ -406,44 +438,14 @@ export default function Sales() {
 
               <TextField
                 label="Cliente"
-                value={formSale.client_name}
+                value={formSale.client_name || ""}
                 onChange={(e) => setFormSale({ client_name: e.target.value })}
                 fullWidth
               />
 
-              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <TextField
-                  label="Unidades (opcional)"
-                  type="number"
-                  value={formSale.units_count}
-                  onChange={(e) => setFormSale({ units_count: e.target.value })}
-                  fullWidth
-                />
-
-                <TextField
-                  label="Tabla usada"
-                  value={formSale.tier_used}
-                  onChange={(e) => setFormSale({ tier_used: e.target.value })}
-                  select
-                  fullWidth
-                >
-                  <MenuItem value="1">Tabla 1</MenuItem>
-                  <MenuItem value="2">Tabla 2</MenuItem>
-                  <MenuItem value="3">Tabla 3</MenuItem>
-                </TextField>
-
-                <TextField
-                  label="Comisión (COP)"
-                  type="number"
-                  value={formSale.commission_value}
-                  onChange={(e) => setFormSale({ commission_value: e.target.value })}
-                  fullWidth
-                />
-              </Stack>
-
               <TextField
                 label="Notas (opcional)"
-                value={formSale.notes}
+                value={formSale.notes || ""}
                 onChange={(e) => setFormSale({ notes: e.target.value })}
                 fullWidth
                 multiline
