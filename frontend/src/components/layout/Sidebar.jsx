@@ -54,12 +54,12 @@ const navSections = [
     title: "Comisiones",
     items: [
       {
-        label: "Comisiones",
+        label: "Calcular",
         to: "/commissions/runs",
         icon: <PaymentsRoundedIcon />,
       },
       {
-        label: "Statements",
+        label: "Parametros",
         to: "/commissions/statements",
         icon: <DescriptionRoundedIcon />,
       },

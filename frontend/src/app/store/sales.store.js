@@ -175,15 +175,12 @@ export const useSalesStore = create((set, get) => ({
       openForm: true,
       formMode: "create",
       error: null,
+      // dentro de openCreate
       formSale: {
         brand_id,
         advisor_id: "",
         vehicle_id: "",
-        sale_date: new Date().toISOString().slice(0, 10), // yyyy-mm-dd
-        cut_month: new Date().getMonth() + 1,
-        fortnight: "FIRST",
-        charge_month: null,
-
+        sale_date: new Date().toISOString().slice(0, 10),
         invoice: "",
         client_name: "",
         plate: "",
@@ -239,19 +236,12 @@ export const useSalesStore = create((set, get) => ({
 
     try {
       // ✅ payload limpio (sin comisión/tabla)
+      // dentro de submitForm
       const payload = {
         brand_id: Number(formSale.brand_id),
         advisor_id: Number(formSale.advisor_id),
         vehicle_id: Number(formSale.vehicle_id),
         sale_date: formSale.sale_date,
-
-        cut_month: Number(formSale.cut_month),
-        fortnight: formSale.fortnight,
-        charge_month:
-          formSale.charge_month === "" || formSale.charge_month === null
-            ? null
-            : Number(formSale.charge_month),
-
         invoice: formSale.invoice?.trim() || null,
         client_name: String(formSale.client_name || "").trim(),
         plate: formSale.plate?.trim() || null,

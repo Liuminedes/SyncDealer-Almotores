@@ -240,7 +240,6 @@ export default function Sales() {
                   <TableCell sx={{ fontWeight: 900 }}>Placa</TableCell>
                   <TableCell sx={{ fontWeight: 900 }}>Vehículo</TableCell>
                   <TableCell sx={{ fontWeight: 900 }}>Asesor</TableCell>
-                  <TableCell sx={{ fontWeight: 900 }}>Corte</TableCell>
                 </TableRow>
               </TableHead>
 
@@ -323,23 +322,6 @@ export default function Sales() {
                         >
                           {s.advisor?.email || ""}
                         </Typography>
-                      </TableCell>
-
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 900 }}>
-                          {s.cut_month ? getMonthName(s.cut_month) : "—"}{" "}
-                          {s.fortnight
-                            ? `(${s.fortnight === "FIRST" ? "1ra quincena" : "2da quincena"})`
-                            : ""}
-                        </Typography>
-                        {s.charge_month ? (
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "text.secondary" }}
-                          >
-                            Cobro: {getMonthName(s.charge_month)}
-                          </Typography>
-                        ) : null}
                       </TableCell>
                     </TableRow>
                   ))
@@ -444,60 +426,6 @@ export default function Sales() {
                   InputLabelProps={{ shrink: true }}
                   fullWidth
                 />
-              </Stack>
-
-              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                {/* Mes de corte */}
-                <TextField
-                  label="Mes de corte"
-                  value={formSale.cut_month ?? ""}
-                  onChange={(e) =>
-                    setFormSale({ cut_month: Number(e.target.value) })
-                  }
-                  select
-                  fullWidth
-                >
-                  <MenuItem value="">Selecciona…</MenuItem>
-                  {MONTHS.map((m) => (
-                    <MenuItem key={m.value} value={m.value}>
-                      {m.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
-
-                {/* Quincena */}
-                <TextField
-                  label="Quincena de corte"
-                  value={formSale.fortnight || "FIRST"}
-                  onChange={(e) => setFormSale({ fortnight: e.target.value })}
-                  select
-                  fullWidth
-                >
-                  <MenuItem value="FIRST">Primera quincena</MenuItem>
-                  <MenuItem value="SECOND">Segunda quincena</MenuItem>
-                </TextField>
-
-                {/* Mes de cobro */}
-                <TextField
-                  label="Mes de cobro (opcional)"
-                  value={formSale.charge_month ?? ""}
-                  onChange={(e) =>
-                    setFormSale({
-                      charge_month: e.target.value
-                        ? Number(e.target.value)
-                        : null,
-                    })
-                  }
-                  select
-                  fullWidth
-                >
-                  <MenuItem value="">—</MenuItem>
-                  {MONTHS.map((m) => (
-                    <MenuItem key={m.value} value={m.value}>
-                      {m.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
               </Stack>
 
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>

@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const listRunsSchema = {
   query: z.object({
-    brand: z.string().min(1).optional(), // viene de query ?brand=KIA
+    brand: z.string().min(1).optional(),
     page: z.coerce.number().int().min(1).optional(),
     limit: z.coerce.number().int().min(1).max(100).optional(),
 
@@ -27,7 +27,12 @@ export const calculateRunSchema = {
     cut_year: z.coerce.number().int().min(2000).max(2100),
     cut_month: z.coerce.number().int().min(1).max(12),
     fortnight: z.enum(["FIRST", "SECOND"]),
-    notes: z.string().max(255).optional(),
+    notes: z
+      .string()
+      .max(255)
+      .optional()
+      .nullable()
+      .transform((v) => (v == null ? undefined : String(v).trim())),
   }),
 };
 

@@ -15,8 +15,11 @@ export const list = async (req, res) => {
   const where = {};
 
   if (brand_id) where.brand_id = brand_id;
+
   if (date_from && date_to) {
-    where.sale_date = { $between: [date_from, date_to] };
+    where.sale_date = {
+      $between: [date_from, date_to],
+    };
   }
 
   if (q) {
@@ -51,7 +54,18 @@ export const list = async (req, res) => {
 };
 
 export const create = async (req, res) => {
-  const sale = await Sale.create(req.body);
+  const saleDate = new Date(req.body.sale_date);
+  const month = saleDate.getMonth() + 1;
+  const day = saleDate.getDate();
+
+  const payload = {
+    ...req.body,
+    cut_month: month,
+    fortnight: day <= 15 ? "FIRST" : "SECOND",
+    charge_month: null,
+  };
+
+  const sale = await Sale.create(payload);
   res.status(201).json({ sale });
 };
 
@@ -65,6 +79,16 @@ export const update = async (req, res) => {
   const sale = await Sale.findByPk(req.params.id);
   if (!sale) return res.status(404).json({ message: "Venta no encontrada" });
 
-  await sale.update(req.body);
+  const saleDate = new Date(req.body.sale_date);
+  const month = saleDate.getMonth() + 1;
+  const day = saleDate.getDate();
+
+  await sale.update({
+    ...req.body,
+    cut_month: month,
+    fortnight: day <= 15 ? "FIRST" : "SECOND",
+    charge_month: null,
+  });
+
   res.json({ sale });
 };
