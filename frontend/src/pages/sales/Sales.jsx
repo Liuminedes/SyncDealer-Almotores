@@ -447,15 +447,25 @@ export default function Sales() {
               </Stack>
 
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                {/* Mes de corte */}
                 <TextField
-                  label="Mes de corte (Enero – Diciembre)"
-                  type="number"
+                  label="Mes de corte"
                   value={formSale.cut_month ?? ""}
-                  onChange={(e) => setFormSale({ cut_month: e.target.value })}
+                  onChange={(e) =>
+                    setFormSale({ cut_month: Number(e.target.value) })
+                  }
+                  select
                   fullWidth
-                  inputProps={{ min: 1, max: 12 }}
-                />
+                >
+                  <MenuItem value="">Selecciona…</MenuItem>
+                  {MONTHS.map((m) => (
+                    <MenuItem key={m.value} value={m.value}>
+                      {m.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
 
+                {/* Quincena */}
                 <TextField
                   label="Quincena de corte"
                   value={formSale.fortnight || "FIRST"}
@@ -467,16 +477,27 @@ export default function Sales() {
                   <MenuItem value="SECOND">Segunda quincena</MenuItem>
                 </TextField>
 
+                {/* Mes de cobro */}
                 <TextField
                   label="Mes de cobro (opcional)"
-                  type="number"
                   value={formSale.charge_month ?? ""}
                   onChange={(e) =>
-                    setFormSale({ charge_month: e.target.value })
+                    setFormSale({
+                      charge_month: e.target.value
+                        ? Number(e.target.value)
+                        : null,
+                    })
                   }
+                  select
                   fullWidth
-                  inputProps={{ min: 1, max: 12 }}
-                />
+                >
+                  <MenuItem value="">—</MenuItem>
+                  {MONTHS.map((m) => (
+                    <MenuItem key={m.value} value={m.value}>
+                      {m.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
               </Stack>
 
               <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
