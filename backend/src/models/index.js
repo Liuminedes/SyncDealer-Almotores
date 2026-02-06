@@ -14,10 +14,9 @@ import Sale from "./Sale.js";
 import CommissionRun from "./CommissionRun.js";
 import CommissionStatementItem from "./CommissionStatementItem.js";
 
-// (Reglas existentes) — si luego las conectamos, las importamos.
-// import CommissionScheme from "./CommissionScheme.js";
-// import CommissionTier from "./CommissionTier.js";
-// import CommissionVehicleRate from "./CommissionVehicleRate.js";
+// ✅ NUEVO: Schemes & Tiers (configuración por marca)
+import CommissionScheme from "./CommissionScheme.js";
+import CommissionTier from "./CommissionTier.js";
 
 // ===== Associations =====
 
@@ -91,6 +90,18 @@ Sale.hasMany(CommissionStatementItem, { as: "commissionItems", foreignKey: "sale
 CommissionStatementItem.belongsTo(Vehicle, { as: "vehicle", foreignKey: "vehicle_id" });
 Vehicle.hasMany(CommissionStatementItem, { as: "commissionItems", foreignKey: "vehicle_id" });
 
+// ============================
+// ✅ NUEVO: Schemes & Tiers
+// ============================
+
+// Brand <-> CommissionScheme
+CommissionScheme.belongsTo(Brand, { as: "brand", foreignKey: "brand_id" });
+Brand.hasMany(CommissionScheme, { as: "commissionSchemes", foreignKey: "brand_id" });
+
+// CommissionScheme <-> CommissionTier
+CommissionTier.belongsTo(CommissionScheme, { as: "scheme", foreignKey: "scheme_id" });
+CommissionScheme.hasMany(CommissionTier, { as: "tiers", foreignKey: "scheme_id" });
+
 export {
   sequelize,
   User,
@@ -106,4 +117,8 @@ export {
   // Sprint 6
   CommissionRun,
   CommissionStatementItem,
+
+  // NUEVO
+  CommissionScheme,
+  CommissionTier,
 };

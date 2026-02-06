@@ -20,6 +20,7 @@ import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import DirectionsCarRoundedIcon from "@mui/icons-material/DirectionsCarRounded";
+import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded"; // ✅ NEW
 
 import { useAuthStore } from "../../app/store/auth.store";
 import { DRAWER_WIDTH } from "./MainLayout";
@@ -30,36 +31,18 @@ const navSections = [
     items: [{ label: "Dashboard", to: "/dashboard", icon: <HomeRoundedIcon /> }],
   },
   {
-    title: "Gestión",
+    title: "Operación",
     items: [
-      {
-        label: "Usuarios",
-        to: "/users",
-        icon: <PeopleAltRoundedIcon />,
-        adminOnly: true,
-      },
-      {
-        label: "Vehículos",
-        to: "/vehicles",
-        icon: <DirectionsCarRoundedIcon />,
-      },
-      {
-        label: "Ventas",
-        to: "/sales",
-        icon: <SellRoundedIcon />,
-      },
+      { label: "Vehículos", to: "/vehicles", icon: <DirectionsCarRoundedIcon /> },
+      { label: "Ventas", to: "/sales", icon: <SellRoundedIcon /> },
     ],
   },
   {
     title: "Comisiones",
     items: [
+      { label: "Calcular", to: "/commissions/runs", icon: <PaymentsRoundedIcon /> },
       {
-        label: "Calcular",
-        to: "/commissions/runs",
-        icon: <PaymentsRoundedIcon />,
-      },
-      {
-        label: "Parametros",
+        label: "Parámetros",
         to: "/commissions/statements",
         icon: <DescriptionRoundedIcon />,
       },
@@ -68,10 +51,23 @@ const navSections = [
   {
     title: "Reportes",
     items: [
+      { label: "Exportaciones", to: "/reports/exports", icon: <FileDownloadRoundedIcon /> },
+    ],
+  },
+  {
+    title: "Administración",
+    items: [
       {
-        label: "Exportaciones",
-        to: "/reports/exports",
-        icon: <FileDownloadRoundedIcon />,
+        label: "Usuarios",
+        to: "/users",
+        icon: <PeopleAltRoundedIcon />,
+        adminOnly: true,
+      },
+      {
+        label: "Marcas",
+        to: "/brands",
+        icon: <StorefrontRoundedIcon />,
+        adminOnly: true,
       },
     ],
   },
@@ -164,7 +160,6 @@ export default function Sidebar() {
             Sesión
           </Typography>
 
-          {/* mini indicador */}
           <Chip
             size="small"
             label={user?.is_active === false ? "Bloqueado" : "Activa"}
@@ -186,19 +181,10 @@ export default function Sidebar() {
         <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
           <Chip size="small" label={user?.role || "—"} sx={{ fontWeight: 900 }} />
           {user?.brands?.slice(0, 2)?.map((b) => (
-            <Chip
-              key={b.brand_id}
-              size="small"
-              label={b.code}
-              variant="outlined"
-            />
+            <Chip key={b.brand_id} size="small" label={b.code} variant="outlined" />
           ))}
           {(user?.brands?.length || 0) > 2 && (
-            <Chip
-              size="small"
-              label={`+${user.brands.length - 2}`}
-              variant="outlined"
-            />
+            <Chip size="small" label={`+${user.brands.length - 2}`} variant="outlined" />
           )}
         </Box>
       </Box>
@@ -286,11 +272,6 @@ export default function Sidebar() {
   );
 }
 
-/** mini helper para alinear caption + chip */
 function StackLikeRow({ children }) {
-  return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-      {children}
-    </Box>
-  );
+  return <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>{children}</Box>;
 }

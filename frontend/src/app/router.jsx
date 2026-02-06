@@ -8,6 +8,8 @@ import Dashboard from "../pages/dashboard/Dashboard";
 import Users from "../pages/users/Users";
 import Vehicles from "../pages/vehicles/Vehicles";
 import Sales from "../pages/sales/Sales";
+import Brands from "../pages/brands/Brands";
+import BrandDetail from "../pages/brands/BrandDetail";
 import Runs from "../pages/commissions/Runs";
 import RunDetail from "../pages/commissions/RunDetail";
 import Statements from "../pages/commissions/Statements";
@@ -30,6 +32,8 @@ export const router = createBrowserRouter([
       { path: "/users", element: <Users /> },
       { path: "/vehicles", element: <Vehicles /> },
       { path: "/sales", element: <Sales /> },
+      { path: "/brands", element: <Brands /> },
+      { path: "/brands/:id", element: <BrandDetail /> },
 
       { path: "/commissions/runs", element: <Runs /> },
       { path: "/commissions/runs/:id", element: <RunDetail /> },

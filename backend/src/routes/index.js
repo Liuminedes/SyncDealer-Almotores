@@ -10,6 +10,10 @@ import commissionSchemesRoutes from "./commissionSchemes.routes.js";
 import vehiclesRoutes from "./vehicles.routes.js";
 import salesRoutes from "./sales.routes.js";
 
+// ✅ NUEVAS RUTAS (configuración de marca y tiers)
+import brandConfigRoutes from "./brand-config.routes.js";
+import schemeTiersRoutes from "./scheme-tiers.routes.js";
+
 const router = Router();
 
 router.use("/auth", authRoutes);
@@ -21,5 +25,10 @@ router.use("/commission-runs", commissionRunsRoutes);
 router.use("/commission-schemes", commissionSchemesRoutes);
 router.use("/vehicles", vehiclesRoutes);
 router.use("/sales", salesRoutes);
+
+// ✅ Montar nuevas rutas bajo /api
+// OJO: estas rutas YA incluyen paths completos: /brands/:id/scheme, /schemes/:id/tiers, /tiers/:id
+router.use(brandConfigRoutes);
+router.use(schemeTiersRoutes);
 
 export default router;
