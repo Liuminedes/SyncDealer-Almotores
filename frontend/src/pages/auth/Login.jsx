@@ -144,7 +144,7 @@ export default function Login() {
           </Box>
 
           <Typography variant="h4" sx={{ fontWeight: 900, mb: 0.5 }}>
-            Sign in
+            Acceso Seguro
           </Typography>
           <Typography variant="body2" sx={{ color: "text.secondary", mb: 3 }}>
             Inicia sesión para acceder al dashboard.
@@ -162,7 +162,7 @@ export default function Login() {
             sx={{ display: "grid", gap: 2 }}
           >
             <TextField
-              label="Email"
+              label="Dirección Email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -180,7 +180,7 @@ export default function Login() {
             />
 
             <TextField
-              label="Password"
+              label="Contraseña"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -211,7 +211,7 @@ export default function Login() {
                     onChange={(e) => setRemember(e.target.checked)}
                   />
                 }
-                label="Remember me"
+                label="Recordar datos"
               />
 
               <Typography
@@ -222,9 +222,9 @@ export default function Login() {
                   "&:hover": { color: "primary.main" },
                   userSelect: "none",
                 }}
-                title="Sprint 4: flujo de recuperación/rotación de password"
+                title="Haz clic aqui para reestablecer tu contraseña"
               >
-                Forgot your password?
+                ¿Olvidaste tu Contraseña?
               </Typography>
             </Box>
 
@@ -243,13 +243,13 @@ export default function Login() {
                 )}`,
               }}
             >
-              {isLoggingIn ? "Signing in..." : "Sign in"}
+              {isLoggingIn ? "Ingresando..." : "Ingresar"}
             </Button>
 
             <Divider sx={{ opacity: 0.35 }} />
 
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              <code>Beta v1.0</code>
+            <Typography variant="caption" sx={{ color: "text.secondary"}}>
+              <code>Beta v1.0 - Mauricio Rodriguez 💻</code>
             </Typography>
           </Box>
         </Paper>

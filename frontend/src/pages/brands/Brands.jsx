@@ -217,7 +217,7 @@ export default function Brands() {
 
       {err && <Alert severity="error" sx={{ mb: 2 }}>{err}</Alert>}
 
-      <Paper sx={{ p: 2, borderRadius: 3 }}>
+      <Paper sx={{ p: 2, borderRadius: 1 }}>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
           <TextField
             size="small"
