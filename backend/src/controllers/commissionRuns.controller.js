@@ -1,33 +1,29 @@
-// backend/src/controllers/commissionRuns.controller.js
 import { sequelize } from "../config/db.js";
 import { HttpError } from "../utils/httpError.js";
 
-/**
- * GET /api/commission-runs?brand=KIA&page=1&limit=10&advisor_id=..&cut_year=..&cut_month=..&fortnight=FIRST&status=CALCULATED
- */
 export async function listRuns(req, res, next) {
-    try {
-        const q = req.validated?.query || req.query;
+  try {
+    const q = req.validated?.query || req.query;
 
-        const brandCode = (req.brand?.code || q.brand || "").toUpperCase();
-        if (!brandCode) throw new HttpError(400, "Marca requerida");
+    const brandCode = (req.brand?.code || q.brand || "").toUpperCase();
+    if (!brandCode) throw new HttpError(400, "Marca requerida");
 
-        const page = Number(q.page || 1);
-        const limit = Number(q.limit || 10);
-        const offset = (page - 1) * limit;
+    const page = Number(q.page || 1);
+    const limit = Number(q.limit || 10);
+    const offset = (page - 1) * limit;
 
-        const replacements = {
-            brandCode,
-            limit,
-            offset,
-            advisor_id: q.advisor_id ? Number(q.advisor_id) : null,
-            cut_year: q.cut_year ? Number(q.cut_year) : null,
-            cut_month: q.cut_month ? Number(q.cut_month) : null,
-            fortnight: q.fortnight || null,
-            status: q.status || null,
-        };
+    const replacements = {
+      brandCode,
+      limit,
+      offset,
+      advisor_id: q.advisor_id ? Number(q.advisor_id) : null,
+      cut_year: q.cut_year ? Number(q.cut_year) : null,
+      cut_month: q.cut_month ? Number(q.cut_month) : null,
+      fortnight: q.fortnight || null,
+      status: q.status || null,
+    };
 
-        const where = `
+    const where = `
       WHERE b.code = :brandCode
       ${replacements.advisor_id ? " AND cr.advisor_id = :advisor_id " : ""}
       ${replacements.cut_year ? " AND cr.cut_year = :cut_year " : ""}
@@ -36,20 +32,20 @@ export async function listRuns(req, res, next) {
       ${replacements.status ? " AND cr.status = :status " : ""}
     `;
 
-        const [countRows] = await sequelize.query(
-            `
+    const [countRows] = await sequelize.query(
+      `
       SELECT COUNT(*) as total
       FROM commission_runs cr
       JOIN brands b ON b.id = cr.brand_id
       ${where}
       `,
-            { replacements }
-        );
+      { replacements }
+    );
 
-        const total = Number(countRows?.[0]?.total || 0);
+    const total = Number(countRows?.[0]?.total || 0);
 
-        const [rows] = await sequelize.query(
-            `
+    const [rows] = await sequelize.query(
+      `
       SELECT
         cr.*,
         b.code as brand_code,
@@ -63,36 +59,28 @@ export async function listRuns(req, res, next) {
       ORDER BY cr.id DESC
       LIMIT :limit OFFSET :offset
       `,
-            { replacements }
-        );
+      { replacements }
+    );
 
-        res.json({
-            ok: true,
-            data: {
-                items: rows || [],
-                total,
-                page,
-                limit,
-            },
-        });
-    } catch (err) {
-        next(err);
-    }
+    res.json({
+      ok: true,
+      data: { items: rows || [], total, page, limit },
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
-/**
- * GET /api/commission-runs/:id?brand=KIA
- */
 export async function getRunById(req, res, next) {
-    try {
-        const p = req.validated?.params || req.params;
-        const runId = Number(p.id);
+  try {
+    const p = req.validated?.params || req.params;
+    const runId = Number(p.id);
 
-        const brandCode = (req.brand?.code || req.query.brand || "").toUpperCase();
-        if (!brandCode) throw new HttpError(400, "Marca requerida");
+    const brandCode = (req.brand?.code || req.query.brand || "").toUpperCase();
+    if (!brandCode) throw new HttpError(400, "Marca requerida");
 
-        const [runs] = await sequelize.query(
-            `
+    const [runs] = await sequelize.query(
+      `
       SELECT
         cr.*,
         b.code as brand_code,
@@ -105,14 +93,14 @@ export async function getRunById(req, res, next) {
       WHERE cr.id = :runId AND b.code = :brandCode
       LIMIT 1
       `,
-            { replacements: { runId, brandCode } }
-        );
+      { replacements: { runId, brandCode } }
+    );
 
-        const run = runs?.[0];
-        if (!run) throw new HttpError(404, "Corrida no encontrada");
+    const run = runs?.[0];
+    if (!run) throw new HttpError(404, "Corrida no encontrada");
 
-        const [items] = await sequelize.query(
-            `
+    const [items] = await sequelize.query(
+      `
       SELECT
         cri.*,
         s.sale_date,
@@ -130,64 +118,45 @@ export async function getRunById(req, res, next) {
       WHERE cri.run_id = :runId
       ORDER BY cri.id ASC
       `,
-            { replacements: { runId } }
-        );
+      { replacements: { runId } }
+    );
 
-        res.json({
-            ok: true,
-            data: {
-                run,
-                items: items || [],
-            },
-        });
-    } catch (err) {
-        next(err);
-    }
+    res.json({ ok: true, data: { run, items: items || [] } });
+  } catch (err) {
+    next(err);
+  }
 }
 
-/**
- * POST /api/commission-runs/calculate?brand=KIA
- * body: { advisor_id, cut_year, cut_month, fortnight, notes? }
- *
- * Crea o recalcula una corrida:
- * - toma ventas por brand_id + advisor_id + cut_month + fortnight + YEAR(sale_date)=cut_year
- * - units_total = #ventas
- * - total_commission = SUM(rate_amount)
- * - status => CALCULATED
- */
 export async function calculateRun(req, res, next) {
-    const t = await sequelize.transaction();
-    try {
-        const b = req.validated?.body || req.body;
-        const brandCode = (req.brand?.code || req.query.brand || "").toUpperCase();
-        if (!brandCode) throw new HttpError(400, "Marca requerida");
+  const t = await sequelize.transaction();
+  try {
+    const b = req.validated?.body || req.body;
+    const brandCode = (req.brand?.code || req.query.brand || "").toUpperCase();
+    if (!brandCode) throw new HttpError(400, "Marca requerida");
 
-        const advisorId = Number(b.advisor_id);
-        const cutYear = Number(b.cut_year);
-        const cutMonth = Number(b.cut_month);
-        const fortnight = String(b.fortnight || "").toUpperCase();
+    const advisorId = Number(b.advisor_id);
+    const cutYear = Number(b.cut_year);
+    const cutMonth = Number(b.cut_month);
+    const fortnight = String(b.fortnight || "").toUpperCase();
 
-        if (!advisorId || !cutYear || !cutMonth || !fortnight) {
-            throw new HttpError(
-                400,
-                "advisor_id, cut_year, cut_month y fortnight son obligatorios"
-            );
-        }
-        if (!["FIRST", "SECOND"].includes(fortnight)) {
-            throw new HttpError(400, "fortnight inválido");
-        }
+    if (!advisorId || !cutYear || !cutMonth || !fortnight) {
+      throw new HttpError(400, "advisor_id, cut_year, cut_month y fortnight son obligatorios");
+    }
+    if (!["FIRST", "SECOND"].includes(fortnight)) {
+      throw new HttpError(400, "fortnight inválido");
+    }
 
-        // 1) Brand id
-        const [brandRows] = await sequelize.query(
-            `SELECT id FROM brands WHERE code = :brand_code LIMIT 1`,
-            { replacements: { brand_code: brandCode }, transaction: t }
-        );
-        const brandId = brandRows?.[0]?.id;
-        if (!brandId) throw new HttpError(400, `Marca no encontrada (${brandCode})`);
+    // 1) Brand id
+    const [brandRows] = await sequelize.query(
+      `SELECT id FROM brands WHERE code = :brand_code LIMIT 1`,
+      { replacements: { brand_code: brandCode }, transaction: t }
+    );
+    const brandId = brandRows?.[0]?.id;
+    if (!brandId) throw new HttpError(400, `Marca no encontrada (${brandCode})`);
 
-        // 2) Buscar corrida existente
-        const [existingRows] = await sequelize.query(
-            `
+    // 2) Buscar corrida existente
+    const [existingRows] = await sequelize.query(
+      `
       SELECT id, status
       FROM commission_runs
       WHERE brand_id = :brand_id
@@ -197,32 +166,29 @@ export async function calculateRun(req, res, next) {
         AND fortnight = :fortnight
       LIMIT 1
       `,
-            {
-                replacements: {
-                    brand_id: brandId,
-                    advisor_id: advisorId,
-                    cut_year: cutYear,
-                    cut_month: cutMonth,
-                    fortnight,
-                },
-                transaction: t,
-            }
-        );
+      {
+        replacements: {
+          brand_id: brandId,
+          advisor_id: advisorId,
+          cut_year: cutYear,
+          cut_month: cutMonth,
+          fortnight,
+        },
+        transaction: t,
+      }
+    );
 
-        let runId = existingRows?.[0]?.id || null;
-        const existingStatus = existingRows?.[0]?.status;
+    let runId = existingRows?.[0]?.id || null;
+    const existingStatus = existingRows?.[0]?.status;
 
-        if (runId && ["APPROVED", "PAID"].includes(String(existingStatus))) {
-            throw new HttpError(
-                409,
-                `No se puede recalcular una corrida en estado ${existingStatus}`
-            );
-        }
+    if (runId && ["APPROVED", "PAID"].includes(String(existingStatus))) {
+      throw new HttpError(409, `No se puede recalcular una corrida en estado ${existingStatus}`);
+    }
 
-        // 3) Scheme activo (ahorita: el último ACTIVE; luego refinamos por valid_from/valid_to)
-        const [schemeRows] = await sequelize.query(
-            `
-      SELECT cs.id
+    // 3) Scheme activo + tipo (legacy: KIA_PLAN vs STANDARD)
+    const [schemeRows] = await sequelize.query(
+      `
+      SELECT cs.id, cs.scheme_type
       FROM commission_schemes cs
       JOIN brands b ON b.id = cs.brand_id
       WHERE b.code = :brand_code
@@ -230,50 +196,56 @@ export async function calculateRun(req, res, next) {
       ORDER BY cs.id DESC
       LIMIT 1
       `,
-            { replacements: { brand_code: brandCode }, transaction: t }
-        );
-        const schemeId = schemeRows?.[0]?.id || null;
+      { replacements: { brand_code: brandCode }, transaction: t }
+    );
 
-        // 4) Ventas del mes vencido (mes anterior al corte seleccionado)
-        let targetYear = cutYear;
-        let targetMonth = cutMonth - 1;
-        if (targetMonth <= 0) {
-            targetMonth = 12;
-            targetYear = cutYear - 1;
-        }
+    const schemeId = schemeRows?.[0]?.id || null;
+    const schemeType = String(schemeRows?.[0]?.scheme_type || "").toUpperCase(); // 'KIA_PLAN' | 'STANDARD'
+    if (!schemeId) throw new HttpError(400, "No hay un scheme ACTIVE para esta marca");
 
-        // Rango semiabierto: [from, nextMonthStart) para evitar problemas de hora
-        const from = new Date(targetYear, targetMonth - 1, 1);
-        const nextMonthStart = new Date(targetYear, targetMonth, 1);
+    const isRanges = schemeType === "KIA_PLAN";
 
-        const [salesRows] = await sequelize.query(
-            `
-  SELECT s.id as sale_id, s.vehicle_id
-  FROM sales s
-  WHERE s.brand_id = :brand_id
-    AND s.advisor_id = :advisor_id
-    AND s.sale_date >= :from
-    AND s.sale_date < :to
-  ORDER BY s.sale_date ASC, s.id ASC
-  `,
-            {
-                replacements: {
-                    brand_id: brandId,
-                    advisor_id: advisorId,
-                    from,
-                    to: nextMonthStart,
-                },
-                transaction: t,
-            }
-        );
+    // 4) Ventas del mes vencido (mes anterior al corte)
+    let targetYear = cutYear;
+    let targetMonth = cutMonth - 1;
+    if (targetMonth <= 0) {
+      targetMonth = 12;
+      targetYear = cutYear - 1;
+    }
 
-        const unitsTotal = salesRows?.length || 0;
+    const from = new Date(targetYear, targetMonth - 1, 1);
+    const nextMonthStart = new Date(targetYear, targetMonth, 1);
 
-        // 5) Tier (tabla) según unidades
-        let tierId = null;
-        if (schemeId) {
-            const [tierRows] = await sequelize.query(
-                `
+    // Traer sale_id + vehicle_id + sale_price (para percentages)
+    const [salesRows] = await sequelize.query(
+      `
+      SELECT s.id as sale_id, s.vehicle_id, v.sale_price
+      FROM sales s
+      JOIN vehicles v ON v.id = s.vehicle_id
+      WHERE s.brand_id = :brand_id
+        AND s.advisor_id = :advisor_id
+        AND s.sale_date >= :from
+        AND s.sale_date < :to
+      ORDER BY s.sale_date ASC, s.id ASC
+      `,
+      {
+        replacements: {
+          brand_id: brandId,
+          advisor_id: advisorId,
+          from,
+          to: nextMonthStart,
+        },
+        transaction: t,
+      }
+    );
+
+    const unitsTotal = salesRows?.length || 0;
+
+    // 5) Tier según unidades (bucket)
+    let tierId = null;
+    if (schemeId) {
+      const [tierRows] = await sequelize.query(
+        `
         SELECT id
         FROM commission_tiers
         WHERE scheme_id = :scheme_id
@@ -282,111 +254,155 @@ export async function calculateRun(req, res, next) {
         ORDER BY priority ASC
         LIMIT 1
         `,
-                {
-                    replacements: { scheme_id: schemeId, units_total: unitsTotal },
-                    transaction: t,
-                }
-            );
-            tierId = tierRows?.[0]?.id || null;
-        }
+        { replacements: { scheme_id: schemeId, units_total: unitsTotal }, transaction: t }
+      );
+      tierId = tierRows?.[0]?.id || null;
+    }
 
-        // 6) Crear o limpiar corrida
-        if (!runId) {
-            const [ins] = await sequelize.query(
-                `
+    // 6) Crear o limpiar corrida
+    if (!runId) {
+      const [ins] = await sequelize.query(
+        `
         INSERT INTO commission_runs
           (brand_id, advisor_id, cut_year, cut_month, fortnight, scheme_id, units_total, total_commission, status, notes, created_by, created_at, updated_at)
         VALUES
           (:brand_id, :advisor_id, :cut_year, :cut_month, :fortnight, :scheme_id, 0, 0, 'DRAFT', :notes, :created_by, NOW(), NOW())
         `,
-                {
-                    replacements: {
-                        brand_id: brandId,
-                        advisor_id: advisorId,
-                        cut_year: cutYear,
-                        cut_month: cutMonth,
-                        fortnight,
-                        scheme_id: schemeId,
-                        notes: b.notes || null,
-                        created_by: req.user?.id || null,
-                    },
-                    transaction: t,
-                }
-            );
-
-            runId = ins?.insertId || null;
-
-            // fallback ultra seguro
-            if (!runId) {
-                const [lastIdRows] = await sequelize.query(`SELECT LAST_INSERT_ID() as id`, {
-                    transaction: t,
-                });
-                runId = lastIdRows?.[0]?.id || null;
-            }
-
-            if (!runId) throw new HttpError(500, "No se pudo crear la corrida");
-        } else {
-            await sequelize.query(
-                `DELETE FROM commission_run_items WHERE run_id = :run_id`,
-                { replacements: { run_id: runId }, transaction: t }
-            );
+        {
+          replacements: {
+            brand_id: brandId,
+            advisor_id: advisorId,
+            cut_year: cutYear,
+            cut_month: cutMonth,
+            fortnight,
+            scheme_id: schemeId,
+            notes: b.notes || null,
+            created_by: req.user?.id || null,
+          },
+          transaction: t,
         }
+      );
 
-        // 7) Map rates por vehicle_id (para el tier elegido)
-        const rateByVehicleId = new Map();
+      runId = ins?.insertId || null;
+      if (!runId) {
+        const [lastIdRows] = await sequelize.query(`SELECT LAST_INSERT_ID() as id`, { transaction: t });
+        runId = lastIdRows?.[0]?.id || null;
+      }
+      if (!runId) throw new HttpError(500, "No se pudo crear la corrida");
+    } else {
+      await sequelize.query(`DELETE FROM commission_run_items WHERE run_id = :run_id`, {
+        replacements: { run_id: runId },
+        transaction: t,
+      });
+    }
 
-        if (schemeId && tierId && unitsTotal > 0) {
-            const [rateRows] = await sequelize.query(
-                `
-  SELECT v.id as vehicle_id, cvr.amount
-  FROM commission_vehicle_rates cvr
-  JOIN vehicles v ON v.code = cvr.vehicle_code
-  WHERE cvr.scheme_id = :scheme_id
-    AND cvr.tier_id = :tier_id
-    AND v.brand_id = :brand_id
-  `,
-                { replacements: { scheme_id: schemeId, tier_id: tierId, brand_id: brandId }, transaction: t }
-            );
+    // 7) Calcular items según modalidad
+    let totalCommission = 0;
 
+    if (isRanges) {
+      // ===== RANGES (monto fijo por vehículo + tier)
+      const rateByVehicleId = new Map();
 
-            for (const r of rateRows || []) {
-                rateByVehicleId.set(Number(r.vehicle_id), Number(r.amount));
-            }
+      if (tierId && unitsTotal > 0) {
+        const [rateRows] = await sequelize.query(
+          `
+          SELECT v.id as vehicle_id, cvr.amount
+          FROM commission_vehicle_rates cvr
+          JOIN vehicles v ON v.code = cvr.vehicle_code
+          WHERE cvr.scheme_id = :scheme_id
+            AND cvr.tier_id = :tier_id
+            AND v.brand_id = :brand_id
+          `,
+          { replacements: { scheme_id: schemeId, tier_id: tierId, brand_id: brandId }, transaction: t }
+        );
+
+        for (const r of rateRows || []) {
+          rateByVehicleId.set(Number(r.vehicle_id), Number(r.amount));
         }
+      }
 
-        // 8) Insert items
-        let totalCommission = 0;
+      for (const s of salesRows || []) {
+        const vehicleId = Number(s.vehicle_id);
+        const amount = Number(rateByVehicleId.get(vehicleId) || 0);
 
-        for (const s of salesRows || []) {
-            const vehicleId = Number(s.vehicle_id);
-            const amount = Number(rateByVehicleId.get(vehicleId) || 0);
+        totalCommission += amount;
 
-            totalCommission += amount;
-
-            await sequelize.query(
-                `
-        INSERT INTO commission_run_items
-          (run_id, sale_id, vehicle_id, tier_id, rate_amount, notes, created_at, updated_at)
-        VALUES
-          (:run_id, :sale_id, :vehicle_id, :tier_id, :rate_amount, :notes, NOW(), NOW())
-        `,
-                {
-                    replacements: {
-                        run_id: runId,
-                        sale_id: s.sale_id,
-                        vehicle_id: vehicleId,
-                        tier_id: tierId,
-                        rate_amount: amount,
-                        notes: amount === 0 ? "Rate no encontrado para este vehículo/tier" : null,
-                    },
-                    transaction: t,
-                }
-            );
-        }
-
-        // 9) Update corrida
         await sequelize.query(
-            `
+          `
+          INSERT INTO commission_run_items
+            (run_id, sale_id, vehicle_id, tier_id, rate_amount, notes, created_at, updated_at)
+          VALUES
+            (:run_id, :sale_id, :vehicle_id, :tier_id, :rate_amount, :notes, NOW(), NOW())
+          `,
+          {
+            replacements: {
+              run_id: runId,
+              sale_id: s.sale_id,
+              vehicle_id: vehicleId,
+              tier_id: tierId,
+              rate_amount: amount,
+              notes: tierId == null ? "Tier no encontrado para units_total" : amount === 0 ? "Rate no encontrado para este vehículo/tier" : null,
+            },
+            transaction: t,
+          }
+        );
+      }
+    } else {
+      // ===== PERCENTAGES (porcentaje por tier aplicado al sale_price)
+      let pct = 0;
+
+      if (tierId) {
+        const [pctRows] = await sequelize.query(
+          `
+          SELECT percentage
+          FROM commission_percentage_tiers
+          WHERE scheme_id = :scheme_id AND tier_id = :tier_id
+          LIMIT 1
+          `,
+          { replacements: { scheme_id: schemeId, tier_id: tierId }, transaction: t }
+        );
+        pct = Number(pctRows?.[0]?.percentage || 0);
+      }
+
+      for (const s of salesRows || []) {
+        const vehicleId = Number(s.vehicle_id);
+        const salePrice = Number(s.sale_price || 0);
+
+        const amount = Number((salePrice * (pct / 100)).toFixed(2));
+        totalCommission += amount;
+
+        await sequelize.query(
+          `
+          INSERT INTO commission_run_items
+            (run_id, sale_id, vehicle_id, tier_id, rate_amount, notes, created_at, updated_at)
+          VALUES
+            (:run_id, :sale_id, :vehicle_id, :tier_id, :rate_amount, :notes, NOW(), NOW())
+          `,
+          {
+            replacements: {
+              run_id: runId,
+              sale_id: s.sale_id,
+              vehicle_id: vehicleId,
+              tier_id: tierId,
+              rate_amount: amount,
+              notes:
+                tierId == null
+                  ? "Tier no encontrado para units_total"
+                  : salePrice <= 0
+                    ? "Vehículo sin sale_price"
+                    : pct <= 0
+                      ? "Porcentaje no configurado para este tier"
+                      : null,
+            },
+            transaction: t,
+          }
+        );
+      }
+    }
+
+    // 8) Update corrida
+    await sequelize.query(
+      `
       UPDATE commission_runs
       SET scheme_id = :scheme_id,
           units_total = :units_total,
@@ -395,81 +411,77 @@ export async function calculateRun(req, res, next) {
           updated_at = NOW()
       WHERE id = :run_id
       `,
-            {
-                replacements: {
-                    scheme_id: schemeId,
-                    units_total: unitsTotal,
-                    total_commission: totalCommission,
-                    run_id: runId,
-                },
-                transaction: t,
-            }
-        );
+      {
+        replacements: {
+          scheme_id: schemeId,
+          units_total: unitsTotal,
+          total_commission: totalCommission,
+          run_id: runId,
+        },
+        transaction: t,
+      }
+    );
 
-        await t.commit();
+    await t.commit();
 
-        res.json({
-            ok: true,
-            message: "Corrida calculada",
-            data: {
-                run_id: runId,
-                units_total: unitsTotal,
-                total_commission: Number(totalCommission.toFixed(2)),
-                scheme_id: schemeId,
-                tier_id: tierId,
-            },
-        });
-    } catch (err) {
-        await t.rollback();
-        next(err);
-    }
+    res.json({
+      ok: true,
+      message: "Corrida calculada",
+      data: {
+        run_id: runId,
+        units_total: unitsTotal,
+        total_commission: Number(totalCommission.toFixed(2)),
+        scheme_id: schemeId,
+        tier_id: tierId,
+        scheme_type: schemeType,
+      },
+    });
+  } catch (err) {
+    await t.rollback();
+    next(err);
+  }
 }
 
-/**
- * PATCH /api/commission-runs/:id/status?brand=KIA
- * body: { status: "APPROVED" | "PAID" | "DRAFT" | "CALCULATED" }
- */
 export async function updateRunStatus(req, res, next) {
-    try {
-        const p = req.validated?.params || req.params;
-        const b = req.validated?.body || req.body;
+  try {
+    const p = req.validated?.params || req.params;
+    const b = req.validated?.body || req.body;
 
-        const runId = Number(p.id);
-        const status = String(b.status || "").toUpperCase();
+    const runId = Number(p.id);
+    const status = String(b.status || "").toUpperCase();
 
-        const brandCode = (req.brand?.code || req.query.brand || "").toUpperCase();
-        if (!brandCode) throw new HttpError(400, "Marca requerida");
+    const brandCode = (req.brand?.code || req.query.brand || "").toUpperCase();
+    if (!brandCode) throw new HttpError(400, "Marca requerida");
 
-        if (!["DRAFT", "CALCULATED", "APPROVED", "PAID"].includes(status)) {
-            throw new HttpError(400, "Estado inválido");
-        }
+    if (!["DRAFT", "CALCULATED", "APPROVED", "PAID"].includes(status)) {
+      throw new HttpError(400, "Estado inválido");
+    }
 
-        // Validar que pertenezca a la marca
-        const [rows] = await sequelize.query(
-            `
+    const [rows] = await sequelize.query(
+      `
       SELECT cr.id, cr.status
       FROM commission_runs cr
       JOIN brands b ON b.id = cr.brand_id
       WHERE cr.id = :runId AND b.code = :brandCode
       LIMIT 1
       `,
-            { replacements: { runId, brandCode } }
-        );
+      { replacements: { runId, brandCode } }
+    );
 
-        const run = rows?.[0];
-        if (!run) throw new HttpError(404, "Corrida no encontrada");
+    const run = rows?.[0];
+    if (!run) throw new HttpError(404, "Corrida no encontrada");
 
-        await sequelize.query(
-            `
+    await sequelize.query(
+      `
       UPDATE commission_runs
       SET status = :status, updated_at = NOW()
       WHERE id = :runId
       `,
-            { replacements: { status, runId } }
-        );
+      { replacements: { status, runId } }
+    );
 
-        res.json({ ok: true, message: "Estado actualizado", data: { id: runId, status } });
-    } catch (err) {
-        next(err);
-    }
+    res.json({ ok: true, message: "Estado actualizado", data: { id: runId, status } });
+  } catch (err) {
+    next(err);
+  }
 }

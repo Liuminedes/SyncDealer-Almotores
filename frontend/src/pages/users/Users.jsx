@@ -26,11 +26,14 @@ import {
   FormControlLabel,
   CircularProgress,
   useMediaQuery,
+  Grid,
+  Paper,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import PowerSettingsNewRoundedIcon from "@mui/icons-material/PowerSettingsNewRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -65,7 +68,7 @@ export default function Users() {
     setFormBrandPerm,
     submitForm,
 
-    toggleStatus
+    toggleStatus,
   } = useUsersStore();
 
   const theme = useTheme();
@@ -102,6 +105,21 @@ export default function Users() {
     if (e.key === "Enter") runSearch();
   };
 
+  const permChip = (b) => {
+    const v = !!b.can_view;
+    const g = !!b.can_generate;
+
+    if (v && g) return { label: "Ver + Generar", color: "success" };
+    if (v) return { label: "Solo Ver", color: "info" };
+    if (g) return { label: "Solo Generar", color: "warning" };
+    return { label: "Sin permisos", color: "default" };
+  };
+
+  const applyAllPerms = (patch) => {
+    if (!formBrandsSelection?.length) return;
+    formBrandsSelection.forEach((b) => setFormBrandPerm(b.brand_id, patch));
+  };
+
   return (
     <Box sx={{ width: "100%" }}>
       <Stack spacing={2}>
@@ -116,12 +134,13 @@ export default function Users() {
             <Typography variant="h5" sx={{ fontWeight: 900 }}>
               Usuarios
             </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              CRUD + roles + permisos por marca (Sprint 4)
-            </Typography>
           </Box>
 
-          <Stack direction="row" spacing={1} justifyContent={{ xs: "flex-end", sm: "flex-end" }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            justifyContent={{ xs: "flex-end", sm: "flex-end" }}
+          >
             <Button
               onClick={openCreate}
               variant="contained"
@@ -196,7 +215,11 @@ export default function Users() {
             </TextField>
 
             <Stack direction="row" spacing={1} justifyContent="flex-end">
-              <Button variant="outlined" onClick={runSearch} sx={{ borderRadius: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={runSearch}
+                sx={{ borderRadius: 2 }}
+              >
                 Buscar
               </Button>
               <Button
@@ -241,16 +264,26 @@ export default function Users() {
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={5}>
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 2 }}>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        sx={{ py: 2 }}
+                      >
                         <CircularProgress size={18} />
-                        <Typography variant="body2">Cargando usuarios…</Typography>
+                        <Typography variant="body2">
+                          Cargando usuarios…
+                        </Typography>
                       </Stack>
                     </TableCell>
                   </TableRow>
                 ) : items.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5}>
-                      <Typography variant="body2" sx={{ py: 2, color: "text.secondary" }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ py: 2, color: "text.secondary" }}
+                      >
                         No hay resultados con esos filtros.
                       </Typography>
                     </TableCell>
@@ -262,39 +295,68 @@ export default function Users() {
                         <Typography sx={{ fontWeight: 900, lineHeight: 1.1 }}>
                           {u.full_name}
                         </Typography>
-                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "text.secondary" }}
+                        >
                           {u.email}
                         </Typography>
                       </TableCell>
 
                       <TableCell>
-                        <Chip size="small" label={u?.role?.name || "—"} sx={{ fontWeight: 800 }} />
+                        <Chip
+                          size="small"
+                          label={u?.role?.name || "—"}
+                          sx={{ fontWeight: 800 }}
+                        />
                       </TableCell>
 
                       <TableCell>
                         <Chip
                           size="small"
                           label={u.is_active ? "Activo" : "Inactivo"}
-                          sx={{ fontWeight: 800, opacity: u.is_active ? 1 : 0.7 }}
+                          sx={{
+                            fontWeight: 800,
+                            opacity: u.is_active ? 1 : 0.7,
+                          }}
                         />
                       </TableCell>
 
                       <TableCell>
-                        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                          {u.brands?.length ? `${u.brands.length} asignadas` : "—"}
+                        <Typography
+                          variant="body2"
+                          sx={{ color: "text.secondary" }}
+                        >
+                          {u.brands?.length
+                            ? `${u.brands.length} asignadas`
+                            : "—"}
                         </Typography>
                       </TableCell>
 
                       <TableCell align="right">
-                        <Stack direction="row" spacing={0.75} justifyContent="flex-end">
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          justifyContent="flex-end"
+                        >
                           <Tooltip title="Editar">
-                            <IconButton onClick={() => openEdit(u)} size="small" sx={actionBtnSx}>
+                            <IconButton
+                              onClick={() => openEdit(u)}
+                              size="small"
+                              sx={actionBtnSx}
+                            >
                               <EditRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
 
-                          <Tooltip title={u.is_active ? "Desactivar" : "Activar"}>
-                            <IconButton onClick={() => toggleStatus(u)} size="small" sx={actionBtnSx}>
+                          <Tooltip
+                            title={u.is_active ? "Desactivar" : "Activar"}
+                          >
+                            <IconButton
+                              onClick={() => toggleStatus(u)}
+                              size="small"
+                              sx={actionBtnSx}
+                            >
                               <PowerSettingsNewRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -336,81 +398,222 @@ export default function Users() {
         fullWidth
         maxWidth="md"
         fullScreen={isMobile}
+        PaperProps={{
+          sx: {
+            borderRadius: isMobile ? 0 : 1,
+            overflow: "hidden",
+          },
+        }}
       >
-        <DialogTitle sx={{ fontWeight: 900 }}>
-          {formMode === "create" ? "Nuevo usuario" : "Editar usuario"}
+        {/* Header */}
+        <DialogTitle
+          sx={{
+            px: 3,
+            py: 2,
+            fontWeight: 900,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+          }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
+              {formMode === "create" ? "Nuevo usuario" : "Editar usuario"}
+            </Typography>
+
+            <Chip
+              size="small"
+              label={formMode === "create" ? "CREAR" : "EDITAR"}
+              sx={{ fontWeight: 900 }}
+            />
+          </Stack>
+
+          <Tooltip title="Cerrar">
+            <IconButton onClick={closeForm} size="small">
+              <CloseRoundedIcon />
+            </IconButton>
+          </Tooltip>
         </DialogTitle>
 
-        <DialogContent dividers>
+        <Divider />
+
+        <DialogContent
+          sx={{
+            px: 3,
+            py: 2.5,
+            bgcolor: "background.default",
+          }}
+        >
           {!formUser ? (
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 2 }}>
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ py: 2 }}
+            >
               <CircularProgress size={18} />
               <Typography variant="body2">Cargando…</Typography>
             </Stack>
           ) : (
-            <Stack spacing={2} sx={{ pt: 1 }}>
-              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <TextField
-                  label="Nombre completo"
-                  value={formUser.full_name}
-                  onChange={(e) => setFormUser({ full_name: e.target.value })}
-                  fullWidth
-                />
+            <Stack spacing={2.5} sx={{ pt: 0.5 }}>
+              {/* Sección: Datos del usuario */}
+              <Paper
+                variant="outlined"
+                sx={{ p: 2.5, borderRadius: 1, bgcolor: "background.paper" }}
+              >
+                <Typography sx={{ fontWeight: 900, mb: 2 }}>
+                  Información del usuario
+                </Typography>
 
-                <TextField
-                  label="Email"
-                  value={formUser.email}
-                  onChange={(e) => setFormUser({ email: e.target.value })}
-                  fullWidth
-                />
-              </Stack>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Nombre completo"
+                      value={formUser.full_name}
+                      onChange={(e) =>
+                        setFormUser({ full_name: e.target.value })
+                      }
+                      fullWidth
+                    />
+                  </Grid>
 
-              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <TextField
-                  label={formMode === "create" ? "Contraseña" : "Contraseña (opcional)"}
-                  value={formUser.password}
-                  onChange={(e) => setFormUser({ password: e.target.value })}
-                  type="password"
-                  fullWidth
-                />
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Email"
+                      value={formUser.email}
+                      onChange={(e) => setFormUser({ email: e.target.value })}
+                      fullWidth
+                    />
+                  </Grid>
 
-                <TextField
-                  label="Rol"
-                  value={formUser.role_id}
-                  onChange={(e) => setFormUser({ role_id: e.target.value })}
-                  select
-                  fullWidth
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label={
+                        formMode === "create"
+                          ? "Contraseña"
+                          : "Contraseña (opcional)"
+                      }
+                      value={formUser.password}
+                      onChange={(e) =>
+                        setFormUser({ password: e.target.value })
+                      }
+                      type="password"
+                      fullWidth
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Rol"
+                      value={formUser.role_id}
+                      onChange={(e) => setFormUser({ role_id: e.target.value })}
+                      select
+                      fullWidth
+                    >
+                      <MenuItem value="">Selecciona…</MenuItem>
+                      {roleOptions.map((r) => (
+                        <MenuItem key={r.id} value={String(r.id)}>
+                          {r.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Sección: Estado */}
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2.5,
+                  borderRadius: 1,
+                  bgcolor: "background.paper",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 2,
+                }}
+              >
+                <Box>
+                  <Typography sx={{ fontWeight: 900 }}>Estado</Typography>
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    Controla si el usuario puede ingresar al sistema.
+                  </Typography>
+                </Box>
+
+                <FormControlLabel
+                  sx={{ m: 0 }}
+                  control={
+                    <Switch
+                      checked={!!formUser.is_active}
+                      onChange={(e) =>
+                        setFormUser({ is_active: e.target.checked })
+                      }
+                    />
+                  }
+                  label={formUser.is_active ? "Activo" : "Inactivo"}
+                />
+              </Paper>
+
+              {/* Sección: Permisos por marca */}
+              <Paper
+                variant="outlined"
+                sx={{ p: 2.5, borderRadius: 1, bgcolor: "background.paper" }}
+              >
+                <Stack
+                  direction={{ xs: "column", md: "row" }}
+                  spacing={1.5}
+                  alignItems={{ xs: "flex-start", md: "center" }}
+                  justifyContent="space-between"
+                  sx={{ mb: 2 }}
                 >
-                  <MenuItem value="">Selecciona…</MenuItem>
-                  {roleOptions.map((r) => (
-                    <MenuItem key={r.id} value={String(r.id)}>
-                      {r.name}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Stack>
+                  <Stack spacing={0.25}>
+                    <Typography sx={{ fontWeight: 900 }}>
+                      Permisos por marca
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "text.secondary" }}
+                    >
+                      Define qué puede hacer este usuario dentro de cada marca.
+                    </Typography>
+                  </Stack>
 
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={!!formUser.is_active}
-                    onChange={(e) => setFormUser({ is_active: e.target.checked })}
-                  />
-                }
-                label="Activo"
-              />
-
-              {/* Permisos por marca en el Form */}
-              <Card sx={{ p: 2, borderRadius: 3 }}>
-                <Typography sx={{ fontWeight: 900, mb: 0.5 }}>
-                  Permisos por marca
-                </Typography>
-                <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>
-                  Define si este usuario puede ver o generar reportes por marca.
-                </Typography>
+                  {/* Acciones globales (escala muy bien cuando haya muchas marcas) */}
+                  <Stack direction="row" spacing={2} alignItems="center">
+                    <FormControlLabel
+                      sx={{ m: 0 }}
+                      control={
+                        <Switch
+                          onChange={(e) =>
+                            applyAllPerms({ can_view: e.target.checked })
+                          }
+                        />
+                      }
+                      label="Ver todas"
+                    />
+                    <FormControlLabel
+                      sx={{ m: 0 }}
+                      control={
+                        <Switch
+                          onChange={(e) =>
+                            applyAllPerms({ can_generate: e.target.checked })
+                          }
+                        />
+                      }
+                      label="Generar todas"
+                    />
+                  </Stack>
+                </Stack>
 
                 {formBrandsSelection === null ? (
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ py: 1 }}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    sx={{ py: 1 }}
+                  >
                     <CircularProgress size={18} />
                     <Typography variant="body2">Cargando marcas…</Typography>
                   </Stack>
@@ -419,72 +622,151 @@ export default function Users() {
                     No hay marcas para mostrar.
                   </Typography>
                 ) : (
-                  <Stack spacing={1}>
-                    {formBrandsSelection.map((b) => (
-                      <Card key={b.brand_id} sx={{ p: 1.5, borderRadius: 2 }}>
-                        <Stack
-                          direction={{ xs: "column", md: "row" }}
-                          spacing={1}
-                          alignItems={{ xs: "flex-start", md: "center" }}
-                          justifyContent="space-between"
-                        >
-                          <Box>
-                            <Typography sx={{ fontWeight: 900 }}>
-                              {b.name} <span style={{ opacity: 0.7 }}>({b.code})</span>
-                            </Typography>
-                          </Box>
+                  <TableContainer
+                    sx={{
+                      borderRadius: 1,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      maxHeight: { xs: "55vh", md: 360 },
+                    }}
+                  >
+                    <Table stickyHeader size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 900 }}>Marca</TableCell>
+                          <TableCell
+                            sx={{ fontWeight: 900, width: 140 }}
+                            align="center"
+                          >
+                            Ver
+                          </TableCell>
+                          <TableCell
+                            sx={{ fontWeight: 900, width: 160 }}
+                            align="center"
+                          >
+                            Generar
+                          </TableCell>
+                          <TableCell
+                            sx={{ fontWeight: 900, width: 160 }}
+                            align="right"
+                          >
+                            Estado
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
 
-                          <Stack direction="row" spacing={2}>
-                            <FormControlLabel
-                              control={
+                      <TableBody>
+                        {formBrandsSelection.map((b) => {
+                          const chip = permChip(b);
+
+                          return (
+                            <TableRow key={b.brand_id} hover>
+                              <TableCell>
+                                <Typography
+                                  sx={{ fontWeight: 900, lineHeight: 1.1 }}
+                                >
+                                  {b.name}{" "}
+                                  <Typography
+                                    component="span"
+                                    sx={{
+                                      color: "text.secondary",
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    ({b.code})
+                                  </Typography>
+                                </Typography>
+                              </TableCell>
+
+                              <TableCell align="center">
                                 <Switch
                                   checked={!!b.can_view}
                                   onChange={(e) =>
-                                    setFormBrandPerm(b.brand_id, { can_view: e.target.checked })
+                                    setFormBrandPerm(b.brand_id, {
+                                      can_view: e.target.checked,
+                                    })
                                   }
                                 />
-                              }
-                              label="View"
-                            />
-                            <FormControlLabel
-                              control={
+                              </TableCell>
+
+                              <TableCell align="center">
                                 <Switch
                                   checked={!!b.can_generate}
                                   onChange={(e) =>
-                                    setFormBrandPerm(b.brand_id, { can_generate: e.target.checked })
+                                    setFormBrandPerm(b.brand_id, {
+                                      can_generate: e.target.checked,
+                                    })
                                   }
                                 />
-                              }
-                              label="Generate"
-                            />
-                          </Stack>
-                        </Stack>
-                      </Card>
-                    ))}
-                  </Stack>
-                )}
-              </Card>
+                              </TableCell>
 
+                              <TableCell align="right">
+                                <Chip
+                                  size="small"
+                                  label={chip.label}
+                                  color={chip.color}
+                                  variant={
+                                    chip.color === "default"
+                                      ? "outlined"
+                                      : "filled"
+                                  }
+                                  sx={{ fontWeight: 900 }}
+                                />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Paper>
+
+              {/* Error */}
               {error ? (
-                <Box>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    borderRadius: 1,
+                    borderColor: "error.main",
+                    bgcolor: "error.lighter",
+                  }}
+                >
                   <Typography variant="body2" sx={{ color: "error.main" }}>
                     {error}
                   </Typography>
-                </Box>
+                </Paper>
               ) : null}
             </Stack>
           )}
         </DialogContent>
 
-        <DialogActions sx={{ px: 2, py: 1.5 }}>
-          <Button onClick={closeForm} variant="outlined">
+        <Divider />
+
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 1.5,
+            bgcolor: "background.paper",
+          }}
+        >
+          <Button
+            onClick={closeForm}
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
             Cancelar
           </Button>
+
           <Button
             onClick={submitForm}
             variant="contained"
             disabled={isSaving || !formUser}
-            sx={{ fontWeight: 900 }}
+            sx={{ fontWeight: 900, borderRadius: 2, px: 2.5 }}
           >
             {isSaving ? "Guardando…" : "Guardar"}
           </Button>

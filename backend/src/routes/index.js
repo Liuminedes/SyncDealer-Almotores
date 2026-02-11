@@ -13,6 +13,7 @@ import salesRoutes from "./sales.routes.js";
 // ✅ NUEVAS RUTAS (configuración de marca y tiers)
 import brandConfigRoutes from "./brand-config.routes.js";
 import schemeTiersRoutes from "./scheme-tiers.routes.js";
+import percentageTiersRoutes from "./percentageTiers.routes.js";
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use("/sales", salesRoutes);
 // OJO: estas rutas YA incluyen paths completos: /brands/:id/scheme, /schemes/:id/tiers, /tiers/:id
 router.use(brandConfigRoutes);
 router.use(schemeTiersRoutes);
+router.use(percentageTiersRoutes);
 
 export default router;

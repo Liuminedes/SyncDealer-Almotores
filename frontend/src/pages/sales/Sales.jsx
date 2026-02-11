@@ -22,9 +22,13 @@ import {
   DialogActions,
   Divider,
   CircularProgress,
+  Grid,
+  Paper,
+  Chip,
 } from "@mui/material";
 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 
@@ -124,9 +128,6 @@ export default function Sales() {
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 900 }}>
               Ventas
-            </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Registro manual de ventas (Sprint 5)
             </Typography>
           </Box>
 
@@ -351,14 +352,60 @@ export default function Sales() {
       </Stack>
 
       {/* =========================
-          Dialog: Create / Edit Sale
-         ========================= */}
-      <Dialog open={openForm} onClose={closeForm} fullWidth maxWidth="md">
-        <DialogTitle sx={{ fontWeight: 900 }}>
-          {formMode === "edit" ? "Editar venta" : "Nueva venta"}
+    Dialog: Create / Edit Sale
+   ========================= */}
+      <Dialog
+        open={openForm}
+        onClose={closeForm}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{
+          sx: {
+            borderRadius: 1,
+            overflow: "hidden",
+          },
+        }}
+      >
+        {/* Header */}
+        <DialogTitle
+          sx={{
+            px: 3,
+            py: 2,
+            fontWeight: 900,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+          }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
+              {formMode === "edit" ? "Editar venta" : "Nueva venta"}
+            </Typography>
+
+            <Chip
+              size="small"
+              label={formMode === "edit" ? "EDITAR" : "CREAR"}
+              sx={{ fontWeight: 900 }}
+            />
+          </Stack>
+
+          <Tooltip title="Cerrar">
+            <IconButton onClick={closeForm} size="small">
+              <CloseRoundedIcon />
+            </IconButton>
+          </Tooltip>
         </DialogTitle>
 
-        <DialogContent dividers>
+        <Divider />
+
+        <DialogContent
+          sx={{
+            px: 3,
+            py: 2.5,
+            bgcolor: "background.default",
+          }}
+        >
           {!formSale ? (
             <Stack
               direction="row"
@@ -370,115 +417,182 @@ export default function Sales() {
               <Typography variant="body2">Cargando…</Typography>
             </Stack>
           ) : (
-            <Stack spacing={2} sx={{ pt: 1 }}>
-              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <TextField
-                  label="Marca"
-                  value={String(formSale.brand_id ?? 6)}
-                  onChange={(e) => handleFormBrandChange(e.target.value)}
-                  select
-                  fullWidth
+            <Stack spacing={2.5} sx={{ pt: 0.5 }}>
+              {/* Sección: Datos principales */}
+              <Paper
+                variant="outlined"
+                sx={{ p: 2.5, borderRadius: 1, bgcolor: "background.paper" }}
+              >
+                <Typography sx={{ fontWeight: 900, mb: 2 }}>
+                  Información de la venta
+                </Typography>
+
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Marca"
+                      value={String(formSale.brand_id ?? 6)}
+                      onChange={(e) => handleFormBrandChange(e.target.value)}
+                      select
+                      fullWidth
+                    >
+                      {brandOptions.map((b) => (
+                        <MenuItem key={b.id} value={String(b.id)}>
+                          {b.name} ({b.code})
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Asesor"
+                      value={String(formSale.advisor_id || "")}
+                      onChange={(e) =>
+                        setFormSale({ advisor_id: e.target.value })
+                      }
+                      select
+                      fullWidth
+                    >
+                      <MenuItem value="">Selecciona…</MenuItem>
+                      {advisorOptions.map((u) => (
+                        <MenuItem key={u.id} value={String(u.id)}>
+                          {u.full_name} — {u.email}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Vehículo"
+                      value={String(formSale.vehicle_id || "")}
+                      onChange={(e) =>
+                        setFormSale({ vehicle_id: e.target.value })
+                      }
+                      select
+                      fullWidth
+                    >
+                      <MenuItem value="">Selecciona…</MenuItem>
+                      {vehicleOptions.map((v) => (
+                        <MenuItem key={v.id} value={String(v.id)}>
+                          {v.code} — {v.model} {v.version}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Fecha venta"
+                      type="date"
+                      value={formSale.sale_date || ""}
+                      onChange={(e) =>
+                        setFormSale({ sale_date: e.target.value })
+                      }
+                      InputLabelProps={{ shrink: true }}
+                      fullWidth
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Sección: Datos de facturación / cliente */}
+              <Paper
+                variant="outlined"
+                sx={{ p: 2.5, borderRadius: 1, bgcolor: "background.paper" }}
+              >
+                <Typography sx={{ fontWeight: 900, mb: 2 }}>
+                  Facturación y cliente
+                </Typography>
+
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Factura"
+                      value={formSale.invoice || ""}
+                      onChange={(e) => setFormSale({ invoice: e.target.value })}
+                      fullWidth
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Placa"
+                      value={formSale.plate || ""}
+                      onChange={(e) => setFormSale({ plate: e.target.value })}
+                      fullWidth
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <TextField
+                      label="Cliente"
+                      value={formSale.client_name || ""}
+                      onChange={(e) =>
+                        setFormSale({ client_name: e.target.value })
+                      }
+                      fullWidth
+                    />
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <TextField
+                      label="Notas (opcional)"
+                      value={formSale.notes || ""}
+                      onChange={(e) => setFormSale({ notes: e.target.value })}
+                      fullWidth
+                      multiline
+                      minRows={2}
+                    />
+                  </Grid>
+                </Grid>
+              </Paper>
+
+              {/* Error */}
+              {error ? (
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    borderRadius: 1,
+                    borderColor: "error.main",
+                    bgcolor: "error.lighter",
+                  }}
                 >
-                  {brandOptions.map((b) => (
-                    <MenuItem key={b.id} value={String(b.id)}>
-                      {b.name} ({b.code})
-                    </MenuItem>
-                  ))}
-                </TextField>
-
-                <TextField
-                  label="Asesor"
-                  value={String(formSale.advisor_id || "")}
-                  onChange={(e) => setFormSale({ advisor_id: e.target.value })}
-                  select
-                  fullWidth
-                >
-                  <MenuItem value="">Selecciona…</MenuItem>
-                  {advisorOptions.map((u) => (
-                    <MenuItem key={u.id} value={String(u.id)}>
-                      {u.full_name} — {u.email}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Stack>
-
-              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <TextField
-                  label="Vehículo"
-                  value={String(formSale.vehicle_id || "")}
-                  onChange={(e) => setFormSale({ vehicle_id: e.target.value })}
-                  select
-                  fullWidth
-                >
-                  <MenuItem value="">Selecciona…</MenuItem>
-                  {vehicleOptions.map((v) => (
-                    <MenuItem key={v.id} value={String(v.id)}>
-                      {v.code} — {v.model} {v.version}
-                    </MenuItem>
-                  ))}
-                </TextField>
-
-                <TextField
-                  label="Fecha venta"
-                  type="date"
-                  value={formSale.sale_date || ""}
-                  onChange={(e) => setFormSale({ sale_date: e.target.value })}
-                  InputLabelProps={{ shrink: true }}
-                  fullWidth
-                />
-              </Stack>
-
-              <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                <TextField
-                  label="Factura"
-                  value={formSale.invoice || ""}
-                  onChange={(e) => setFormSale({ invoice: e.target.value })}
-                  fullWidth
-                />
-                <TextField
-                  label="Placa"
-                  value={formSale.plate || ""}
-                  onChange={(e) => setFormSale({ plate: e.target.value })}
-                  fullWidth
-                />
-              </Stack>
-
-              <TextField
-                label="Cliente"
-                value={formSale.client_name || ""}
-                onChange={(e) => setFormSale({ client_name: e.target.value })}
-                fullWidth
-              />
-
-              <TextField
-                label="Notas (opcional)"
-                value={formSale.notes || ""}
-                onChange={(e) => setFormSale({ notes: e.target.value })}
-                fullWidth
-                multiline
-                minRows={2}
-              />
+                  <Typography variant="body2" sx={{ color: "error.main" }}>
+                    {error}
+                  </Typography>
+                </Paper>
+              ) : null}
             </Stack>
           )}
-
-          {error ? (
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="body2" sx={{ color: "error.main" }}>
-                {error}
-              </Typography>
-            </Box>
-          ) : null}
         </DialogContent>
 
-        <DialogActions sx={{ px: 2, py: 1.5 }}>
-          <Button onClick={closeForm} variant="outlined">
+        <Divider />
+
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 1.5,
+            bgcolor: "background.paper",
+          }}
+        >
+          <Button
+            onClick={closeForm}
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
             Cancelar
           </Button>
           <Button
             onClick={submitForm}
             variant="contained"
             disabled={isSaving || !formSale}
-            sx={{ fontWeight: 900 }}
+            sx={{ fontWeight: 900, borderRadius: 2, px: 2.5 }}
           >
             {isSaving ? "Guardando…" : "Guardar"}
           </Button>

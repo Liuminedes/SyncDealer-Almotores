@@ -1,3 +1,4 @@
+// frontend/src/pages/Brands/BrandDetail.jsx
 import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -19,6 +20,7 @@ import {
   DialogActions,
   Chip,
   Tooltip,
+  CircularProgress,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
@@ -30,6 +32,7 @@ import { brandConfigApi } from "../../api/brandConfig.api";
 import { brandsApi } from "../../api/brands.api";
 import { brandsAdminApi } from "../../api/brands.admin.api";
 import { useAuthStore } from "../../app/store/auth.store";
+import { percentageTiersApi } from "../../api/percentageTiers.api";
 
 // BD -> UI (legacy)
 // BD: STANDARD / KIA_PLAN
@@ -45,7 +48,7 @@ const emptyRange = {
   name: "",
   min: 1,
   max: "", // "" => infinito
-  rate_percent: "", // ✅ nuevo
+  rate_percent: "", // % auxiliar para autocompletar vehículos (RANGES)
 };
 
 function clampInt(v, fallback = 1) {
@@ -73,31 +76,74 @@ export default function BrandDetail() {
   const [err, setErr] = React.useState("");
 
   const [brand, setBrand] = React.useState(null);
-
-  // backend scheme
   const [scheme, setScheme] = React.useState(null);
 
   // UI state
   const [commissionType, setCommissionType] = React.useState("RANGES"); // "RANGES" | "PERCENTAGES"
-  const [ranges, setRanges] = React.useState([]); // tiers
+  const [ranges, setRanges] = React.useState([]); // tiers (para RANGES)
 
-  // Modal rango
+  // PERCENTAGES UI state
+  const [pctRows, setPctRows] = React.useState([]); // [{ id?, tier_id, label, tier_name, percentage }]
+  const [pctLoading, setPctLoading] = React.useState(false);
+  const [pctSavingId, setPctSavingId] = React.useState(null);
+
+  // Modal rango (RANGES)
   const [rangeOpen, setRangeOpen] = React.useState(false);
   const [rangeForm, setRangeForm] = React.useState(emptyRange);
   const [savingRange, setSavingRange] = React.useState(false);
 
   const fetchBrand = React.useCallback(async () => {
-    // UX: necesitamos nombre/código para el título, sin reventar por undefined
     try {
-      const list = isAdmin
-        ? await brandsAdminApi.listAll()
-        : await brandsApi.list();
+      const list = isAdmin ? await brandsAdminApi.listAll() : await brandsApi.list();
       const found = (list || []).find((b) => Number(b.id) === brandId) || null;
       setBrand(found);
     } catch {
       setBrand(null);
     }
   }, [brandId, isAdmin]);
+
+  const loadPercentageMatrix = React.useCallback(
+    async (schemeId) => {
+      setPctLoading(true);
+      try {
+        // tiers “bucket” 1..5 (ya existen en commission_tiers para scheme STANDARD)
+        const tiers = await brandConfigApi.listTiers(schemeId);
+
+        // porcentajes guardados en commission_percentage_tiers
+        const { items } = await percentageTiersApi.listByScheme(schemeId);
+
+        const byTierId = new Map((items || []).map((r) => [Number(r.tier_id), r]));
+
+        const rows = (tiers || [])
+          .slice()
+          .sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999) || (a.min_units ?? 0) - (b.min_units ?? 0) || a.id - b.id)
+          .map((t) => {
+            const maxLabel = t.max_units == null ? "más" : t.max_units;
+            const label =
+              t.min_units === t.max_units
+                ? `${t.min_units} unidad${t.min_units === 1 ? "" : "es"}`
+                : `${t.min_units} a ${maxLabel} unidades`;
+
+            const existing = byTierId.get(Number(t.id));
+            return {
+              id: existing?.id ?? null,
+              tier_id: Number(t.id),
+              tier_name: t.tier_name,
+              label,
+              percentage: existing?.percentage ?? 0,
+            };
+          });
+
+        setPctRows(rows);
+      } catch (e) {
+        setErr(e?.response?.data?.message || "No se pudo cargar la matriz de porcentajes");
+        setPctRows([]);
+      } finally {
+        setPctLoading(false);
+      }
+    },
+    []
+  );
 
   const fetchAll = React.useCallback(async () => {
     setLoading(true);
@@ -120,21 +166,25 @@ export default function BrandDetail() {
             min: t.min_units,
             max: t.max_units ?? "",
             priority: t.priority ?? 1,
-            rate_percent: t.rate_percent ?? "", // ✅ nuevo
-          })),
+            rate_percent: t.rate_percent ?? "", // % auxiliar SOLO para RANGES
+          }))
         );
+
+        if (uiType === "PERCENTAGES") {
+          await loadPercentageMatrix(scheme.id);
+        } else {
+          setPctRows([]);
+        }
       } else {
         setRanges([]);
+        setPctRows([]);
       }
     } catch (e) {
-      setErr(
-        e?.response?.data?.message ||
-          "No se pudo cargar la configuración de la marca",
-      );
+      setErr(e?.response?.data?.message || "No se pudo cargar la configuración de la marca");
     } finally {
       setLoading(false);
     }
-  }, [brandId, fetchBrand]);
+  }, [brandId, fetchBrand, loadPercentageMatrix]);
 
   React.useEffect(() => {
     fetchAll();
@@ -146,6 +196,7 @@ export default function BrandDetail() {
       const { scheme } = await brandConfigApi.upsertScheme(brandId, {
         scheme_type: newType, // UI type (backend mapea a ENUM legacy)
       });
+
       setScheme(scheme || null);
 
       if (scheme?.id) {
@@ -158,15 +209,20 @@ export default function BrandDetail() {
             max: t.max_units ?? "",
             priority: t.priority ?? 1,
             rate_percent: t.rate_percent ?? "",
-          })),
+          }))
         );
+
+        if (newType === "PERCENTAGES") {
+          await loadPercentageMatrix(scheme.id);
+        } else {
+          setPctRows([]);
+        }
       } else {
         setRanges([]);
+        setPctRows([]);
       }
     } catch (e) {
-      setErr(
-        e?.response?.data?.message || "No se pudo guardar el tipo de comisión",
-      );
+      setErr(e?.response?.data?.message || "No se pudo guardar el tipo de comisión");
     }
   };
 
@@ -225,54 +281,35 @@ export default function BrandDetail() {
       min_units: clampInt(rangeForm.min, 1),
       max_units: rangeForm.max === "" ? null : clampInt(rangeForm.max, 1),
       priority: 1,
-      rate_percent: parsePercentInput(rangeForm.rate_percent), // ✅ nuevo
+      rate_percent: parsePercentInput(rangeForm.rate_percent),
     };
 
-    if (!payload.tier_name) {
-      setErr("El nombre del rango es obligatorio.");
-      return;
-    }
-    if (payload.min_units < 1) {
-      setErr("El mínimo debe ser >= 1");
-      return;
-    }
-    if (payload.max_units != null && payload.max_units < payload.min_units) {
-      setErr("El máximo no puede ser menor que el mínimo.");
-      return;
-    }
-    if (
-      payload.rate_percent != null &&
-      (payload.rate_percent < 0 || payload.rate_percent > 100)
-    ) {
-      setErr("El porcentaje debe estar entre 0 y 100.");
-      return;
-    }
+    if (!payload.tier_name) return setErr("El nombre del rango es obligatorio.");
+    if (payload.min_units < 1) return setErr("El mínimo debe ser >= 1");
+    if (payload.max_units != null && payload.max_units < payload.min_units) return setErr("El máximo no puede ser menor que el mínimo.");
+    if (payload.rate_percent != null && (payload.rate_percent < 0 || payload.rate_percent > 100)) return setErr("El porcentaje debe estar entre 0 y 100.");
 
     setSavingRange(true);
     setErr("");
     try {
-      if (rangeForm.id) {
-        await brandConfigApi.updateTier(rangeForm.id, payload);
-      } else {
-        await brandConfigApi.createTier(scheme.id, payload);
-      }
+      if (rangeForm.id) await brandConfigApi.updateTier(rangeForm.id, payload);
+      else await brandConfigApi.createTier(scheme.id, payload);
 
       setRangeOpen(false);
 
       const tiers = await brandConfigApi.listTiers(scheme.id);
-      const mapped = (tiers || [])
-        .map((t) => ({
-          id: t.id,
-          name: t.tier_name,
-          min: t.min_units,
-          max: t.max_units ?? "",
-          priority: t.priority ?? 1,
-          rate_percent: t.rate_percent ?? "",
-        }))
-        .sort((a, b) => a.min - b.min)
-        .map((r, idx) => ({ ...r, priority: idx + 1 }));
-
-      setRanges(mapped);
+      setRanges(
+        (tiers || [])
+          .map((t) => ({
+            id: t.id,
+            name: t.tier_name,
+            min: t.min_units,
+            max: t.max_units ?? "",
+            priority: t.priority ?? 1,
+            rate_percent: t.rate_percent ?? "",
+          }))
+          .sort((a, b) => a.min - b.min)
+      );
     } catch (e) {
       setErr(e?.response?.data?.message || "No se pudo guardar el rango");
     } finally {
@@ -296,7 +333,7 @@ export default function BrandDetail() {
           max: t.max_units ?? "",
           priority: t.priority ?? 1,
           rate_percent: t.rate_percent ?? "",
-        })),
+        }))
       );
     } catch (e) {
       setErr(e?.response?.data?.message || "No se pudo eliminar el rango");
@@ -304,15 +341,34 @@ export default function BrandDetail() {
   };
 
   // -------------------
-  // Porcentajes (PERCENTAGES) placeholder
+  // Porcentajes (PERCENTAGES) => commission_percentage_tiers
   // -------------------
-  const percentageRows = [
-    { units: 1, label: "1", value: "" },
-    { units: 2, label: "2", value: "" },
-    { units: 3, label: "3", value: "" },
-    { units: 4, label: "4", value: "" },
-    { units: 5, label: "5 o más", value: "" },
-  ];
+  const onChangePct = (tierId, value) => {
+    const v = value === "" ? "" : Number(value);
+    setPctRows((prev) =>
+      prev.map((r) => (r.tier_id === tierId ? { ...r, percentage: v } : r))
+    );
+  };
+
+  const savePct = async (row) => {
+    if (!scheme?.id) return;
+    const pct = Number(row.percentage);
+
+    if (!Number.isFinite(pct)) return setErr("El porcentaje debe ser numérico.");
+    if (pct < 0 || pct > 100) return setErr("El porcentaje debe estar entre 0 y 100.");
+
+    setPctSavingId(row.tier_id);
+    setErr("");
+    try {
+      await percentageTiersApi.upsert(scheme.id, row.tier_id, { percentage: pct });
+      // recargar para mantener ids consistentes
+      await loadPercentageMatrix(scheme.id);
+    } catch (e) {
+      setErr(e?.response?.data?.message || "No se pudo guardar el porcentaje");
+    } finally {
+      setPctSavingId(null);
+    }
+  };
 
   const brandTitle = brand
     ? `Configuración de marca – ${brand.name} (${brand.code})`
@@ -333,11 +389,7 @@ export default function BrandDetail() {
 
         <Chip
           size="small"
-          label={
-            commissionType === "RANGES"
-              ? "Comisión por Rangos"
-              : "Comisión por Porcentajes"
-          }
+          label={commissionType === "RANGES" ? "Comisión por Rangos" : "Comisión por Porcentajes"}
           sx={{ fontWeight: 900 }}
         />
       </Stack>
@@ -363,12 +415,9 @@ export default function BrandDetail() {
               control={<Radio />}
               label={
                 <Box>
-                  <Typography sx={{ fontWeight: 800 }}>
-                    Por rangos (KIA)
-                  </Typography>
+                  <Typography sx={{ fontWeight: 800 }}>Por rangos</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Depende de cuántos vehículos se vendan y usa
-                    “tablas/rangos”.
+                    Depende de cuántos vehículos se vendan y usa “tablas/rangos”.
                   </Typography>
                 </Box>
               }
@@ -378,9 +427,7 @@ export default function BrandDetail() {
               control={<Radio />}
               label={
                 <Box>
-                  <Typography sx={{ fontWeight: 800 }}>
-                    Por porcentajes (VW / JAC / Jetour)
-                  </Typography>
+                  <Typography sx={{ fontWeight: 800 }}>Por porcentajes</Typography>
                   <Typography variant="body2" color="text.secondary">
                     Se paga un porcentaje del valor comercial según unidades.
                   </Typography>
@@ -391,27 +438,18 @@ export default function BrandDetail() {
 
           {!scheme?.id && (
             <Alert severity="info" sx={{ mt: 2 }}>
-              Aún no existe configuración en BD para esta marca. Al seleccionar
-              el tipo se crea automáticamente.
+              Aún no existe configuración en BD para esta marca. Al seleccionar el tipo se crea automáticamente.
             </Alert>
           )}
         </Paper>
 
         {commissionType === "RANGES" && (
           <Paper sx={{ p: 2, borderRadius: 1 }}>
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-              sx={{ mb: 1.5 }}
-            >
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
               <Box>
-                <Typography sx={{ fontWeight: 900 }}>
-                  Rangos de venta
-                </Typography>
+                <Typography sx={{ fontWeight: 900 }}>Rangos de venta</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Define rangos y (opcional) el % para autocompletar TABLA_N al
-                  crear vehículos.
+                  Define rangos y (opcional) el % para autocompletar al crear vehículos.
                 </Typography>
               </Box>
 
@@ -429,21 +467,14 @@ export default function BrandDetail() {
             <Divider sx={{ mb: 2 }} />
 
             {!scheme?.id ? (
-              <Alert severity="warning">
-                Selecciona y guarda el tipo de comisión para crear la
-                configuración.
-              </Alert>
+              <Alert severity="warning">Selecciona y guarda el tipo de comisión para crear la configuración.</Alert>
             ) : (
               <Stack spacing={1}>
                 {ranges
                   .slice()
                   .sort((a, b) => a.min - b.min)
                   .map((r) => (
-                    <Paper
-                      key={r.id}
-                      variant="outlined"
-                      sx={{ p: 1.5, borderRadius: 1 }}
-                    >
+                    <Paper key={r.id} variant="outlined" sx={{ p: 1.5, borderRadius: 1 }}>
                       <Stack
                         direction={{ xs: "column", sm: "row" }}
                         alignItems={{ xs: "flex-start", sm: "center" }}
@@ -452,11 +483,7 @@ export default function BrandDetail() {
                         <Box sx={{ flex: 1 }}>
                           <Typography sx={{ fontWeight: 900 }}>
                             {r.name}{" "}
-                            <Typography
-                              component="span"
-                              variant="body2"
-                              color="text.secondary"
-                            >
+                            <Typography component="span" variant="body2" color="text.secondary">
                               (de {r.min} a {r.max === "" ? "∞" : r.max})
                             </Typography>
                           </Typography>
@@ -464,40 +491,22 @@ export default function BrandDetail() {
                           <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
                             <Chip
                               size="small"
-                              label={
-                                r.rate_percent === "" || r.rate_percent == null
-                                  ? "Sin %"
-                                  : `${Number(r.rate_percent)}%`
-                              }
+                              label={r.rate_percent === "" || r.rate_percent == null ? "Sin %" : `${Number(r.rate_percent)}%`}
                               sx={{ fontWeight: 900 }}
                             />
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                color: "text.secondary",
-                                alignSelf: "center",
-                              }}
-                            >
-                              % usado para autocompletar comisión por vehículo
-                              (opcional)
+                            <Typography variant="caption" sx={{ color: "text.secondary", alignSelf: "center" }}>
+                              % usado para autocompletar comisión por vehículo (opcional)
                             </Typography>
                           </Stack>
                         </Box>
 
                         <Stack direction="row" spacing={1} sx={{ ml: "auto" }}>
-                          <Button
-                            size="small"
-                            startIcon={<EditRoundedIcon />}
-                            onClick={() => openEditRange(r)}
-                          >
+                          <Button size="small" startIcon={<EditRoundedIcon />} onClick={() => openEditRange(r)}>
                             Editar
                           </Button>
 
                           <Tooltip title="Eliminar rango">
-                            <IconButton
-                              size="small"
-                              onClick={() => removeRange(r.id)}
-                            >
+                            <IconButton size="small" onClick={() => removeRange(r.id)}>
                               <DeleteOutlineRoundedIcon />
                             </IconButton>
                           </Tooltip>
@@ -508,8 +517,7 @@ export default function BrandDetail() {
 
                 {!ranges.length && (
                   <Alert severity="info">
-                    No hay rangos aún. Ejemplo típico: TABLA_1 (1–4), TABLA_2
-                    (5–9), TABLA_3 (10–∞).
+                    No hay rangos aún. Ejemplo típico: TABLA_1 (1–4), TABLA_2 (5–9), TABLA_3 (10–∞).
                   </Alert>
                 )}
               </Stack>
@@ -519,64 +527,93 @@ export default function BrandDetail() {
 
         {commissionType === "PERCENTAGES" && (
           <Paper sx={{ p: 2, borderRadius: 1 }}>
-            <Typography sx={{ fontWeight: 900, mb: 0.5 }}>
-              Porcentaje según unidades vendidas
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              (Queda listo para conectar cuando creemos la tabla de porcentajes
-              globales por marca.)
-            </Typography>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.5 }}>
+              <Box>
+                <Typography sx={{ fontWeight: 900 }}>Porcentaje según unidades vendidas</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Esta matriz se guarda en <b>commission_percentage_tiers</b>.
+                </Typography>
+              </Box>
 
-            <Stack spacing={1}>
-              {percentageRows.map((row) => (
-                <Stack
-                  key={row.units}
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={2}
-                  alignItems="center"
-                >
-                  <Box sx={{ minWidth: 140 }}>
-                    <Chip
-                      size="small"
-                      label={`${row.label} unidades`}
-                      sx={{ fontWeight: 900 }}
-                    />
-                  </Box>
-                  <TextField
-                    size="small"
-                    label="% Comisión"
-                    placeholder="Ej: 1.5"
-                    fullWidth
-                    disabled
-                  />
+              {pctLoading ? (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <CircularProgress size={16} />
+                  <Typography variant="body2" color="text.secondary">
+                    Cargando…
+                  </Typography>
                 </Stack>
-              ))}
+              ) : null}
             </Stack>
 
-            <Alert severity="warning" sx={{ mt: 2 }}>
-              Aún no está implementada la tabla de porcentajes (Paso 3
-              original).
-            </Alert>
+            <Divider sx={{ mb: 2 }} />
+
+            {!scheme?.id ? (
+              <Alert severity="warning">Selecciona y guarda el tipo de comisión para crear la configuración.</Alert>
+            ) : pctRows.length === 0 ? (
+              <Alert severity="info">
+                No hay tiers/porcentajes cargados para este scheme. (Debes tener los tiers plantilla 1..5 y sus filas en commission_percentage_tiers.)
+              </Alert>
+            ) : (
+              <Stack spacing={1}>
+                {pctRows.map((row) => (
+                  <Paper key={row.tier_id} variant="outlined" sx={{ p: 1.5, borderRadius: 1 }}>
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={2}
+                      alignItems={{ xs: "flex-start", sm: "center" }}
+                      justifyContent="space-between"
+                    >
+                      <Box sx={{ flex: 1 }}>
+                        <Typography sx={{ fontWeight: 900 }}>
+                          {row.tier_name}{" "}
+                          <Typography component="span" variant="body2" color="text.secondary">
+                            ({row.label})
+                          </Typography>
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          % aplicado al sale_price de cada vehículo cuando el asesor cae en este tier por unidades.
+                        </Typography>
+                      </Box>
+
+                      <Stack direction="row" spacing={1} alignItems="center" sx={{ width: { xs: "100%", sm: 340 } }}>
+                        <TextField
+                          size="small"
+                          label="% Comisión"
+                          type="number"
+                          value={row.percentage}
+                          onChange={(e) => onChangePct(row.tier_id, e.target.value)}
+                          fullWidth
+                        />
+                        <Button
+                          variant="contained"
+                          onClick={() => savePct(row)}
+                          disabled={pctSavingId === row.tier_id}
+                          sx={{ fontWeight: 900, whiteSpace: "nowrap" }}
+                        >
+                          {pctSavingId === row.tier_id ? "Guardando…" : "Guardar"}
+                        </Button>
+                      </Stack>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
           </Paper>
         )}
 
         <Paper sx={{ p: 2, borderRadius: 1 }}>
-          <Typography sx={{ fontWeight: 900, mb: 0.5 }}>
-            Bonos y reglas adicionales
-          </Typography>
+          <Typography sx={{ fontWeight: 900, mb: 0.5 }}>Bonos y reglas adicionales</Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-            Vacaciones, antigüedad (&lt; 3 meses), bono por metas, modelos
-            específicos, etc.
+            Vacaciones, antigüedad (&lt; 3 meses), bono por metas, modelos específicos, etc.
           </Typography>
 
           <Alert severity="info">
-            Esta sección es el siguiente bloque: aquí montamos el CRUD de
-            reglas/bonos y luego se aplican en la corrida.
+            Esta sección es el siguiente bloque: aquí montamos el CRUD de reglas/bonos y luego se aplican en la corrida.
           </Alert>
         </Paper>
       </Stack>
 
-      {/* Modal de rango */}
+      {/* Modal de rango (solo RANGES) */}
       <Dialog open={rangeOpen} onClose={closeRange} fullWidth maxWidth="sm">
         <DialogTitle sx={{ fontWeight: 900 }}>
           {rangeForm.id ? "Editar rango" : "Nuevo rango"}
@@ -587,9 +624,7 @@ export default function BrandDetail() {
             <TextField
               label="Nombre"
               value={rangeForm.name}
-              onChange={(e) =>
-                setRangeForm((s) => ({ ...s, name: e.target.value }))
-              }
+              onChange={(e) => setRangeForm((s) => ({ ...s, name: e.target.value }))}
               helperText='Ej: "TABLA_1", "Nivel Oro", "Rango 4"'
               fullWidth
             />
@@ -599,18 +634,14 @@ export default function BrandDetail() {
                 label="Desde (min unidades)"
                 type="number"
                 value={rangeForm.min}
-                onChange={(e) =>
-                  setRangeForm((s) => ({ ...s, min: e.target.value }))
-                }
+                onChange={(e) => setRangeForm((s) => ({ ...s, min: e.target.value }))}
                 fullWidth
               />
               <TextField
                 label="Hasta (max unidades)"
                 type="number"
                 value={rangeForm.max}
-                onChange={(e) =>
-                  setRangeForm((s) => ({ ...s, max: e.target.value }))
-                }
+                onChange={(e) => setRangeForm((s) => ({ ...s, max: e.target.value }))}
                 helperText="Vacío = infinito"
                 fullWidth
               />
@@ -620,9 +651,7 @@ export default function BrandDetail() {
               label="% para autocompletar TABLA (opcional)"
               type="number"
               value={rangeForm.rate_percent}
-              onChange={(e) =>
-                setRangeForm((s) => ({ ...s, rate_percent: e.target.value }))
-              }
+              onChange={(e) => setRangeForm((s) => ({ ...s, rate_percent: e.target.value }))}
               helperText="Ej: 0.8 (significa 0.8% del valor comercial). Déjalo vacío si no aplica."
               fullWidth
             />
@@ -630,9 +659,7 @@ export default function BrandDetail() {
         </DialogContent>
 
         <DialogActions>
-          <Button onClick={closeRange} disabled={savingRange}>
-            Cancelar
-          </Button>
+          <Button onClick={closeRange} disabled={savingRange}>Cancelar</Button>
           <Button
             variant="contained"
             startIcon={<SaveRoundedIcon />}

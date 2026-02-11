@@ -133,18 +133,6 @@ export default function Topbar() {
             <Divider />
 
             {/* Items (como template) */}
-            <MenuItem
-              onClick={() => {
-                setAnchorEl(null);
-                // TODO: cuando exista /profile
-                // navigate("/profile");
-              }}
-            >
-              <ListItemIcon>
-                <PersonRoundedIcon fontSize="small" />
-              </ListItemIcon>
-              Profile
-            </MenuItem>
 
             <MenuItem
               onClick={() => {
@@ -155,7 +143,7 @@ export default function Topbar() {
               <ListItemIcon>
                 <ManageAccountsRoundedIcon fontSize="small" />
               </ListItemIcon>
-              My account
+              Mi Cuenta
             </MenuItem>
 
             <MenuItem
@@ -167,7 +155,7 @@ export default function Topbar() {
               <ListItemIcon>
                 <SettingsRoundedIcon fontSize="small" />
               </ListItemIcon>
-              Settings
+              Configuración
             </MenuItem>
 
             <Divider />
@@ -181,7 +169,7 @@ export default function Topbar() {
               <ListItemIcon>
                 <LogoutRoundedIcon fontSize="small" />
               </ListItemIcon>
-              Logout
+              Cerrar Sesión
             </MenuItem>
           </Menu>
         </Box>

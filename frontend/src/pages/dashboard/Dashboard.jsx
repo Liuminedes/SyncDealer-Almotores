@@ -122,9 +122,9 @@ export default function Dashboard() {
 
       <Card>
         <CardContent>
-          <Typography variant="h6">Accesos por marca</Typography>
+          <Typography variant="h6">Marcas permitidas</Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Permisos cargados desde tu sesión (user_brand_access)
+            Permisos cargados desde tu sesión
           </Typography>
 
           <Box
@@ -156,11 +156,11 @@ export default function Dashboard() {
                   <Box sx={{ display: "flex", gap: 1 }}>
                     <Chip
                       size="small"
-                      label={`view: ${b.can_view ? "sí" : "no"}`}
+                      label={`Ver: ${b.can_view ? "sí" : "no"}`}
                     />
                     <Chip
                       size="small"
-                      label={`generate: ${b.can_generate ? "sí" : "no"}`}
+                      label={`Gestionar: ${b.can_generate ? "sí" : "no"}`}
                     />
                   </Box>
                 </CardContent>

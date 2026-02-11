@@ -23,9 +23,11 @@ import {
   Divider,
   Chip,
   CircularProgress,
+  Paper,
 } from "@mui/material";
 
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 
@@ -140,9 +142,6 @@ export default function Runs() {
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 900 }}>
               Cálculo de comisiones
-            </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Liquidación automática por asesor (mes vencido)
             </Typography>
           </Box>
 
@@ -389,12 +388,55 @@ export default function Runs() {
       </Stack>
 
       {/* =========================
-          Dialog: Calcular comisión
-         ========================= */}
-      <Dialog open={openCalc} onClose={closeCalculate} fullWidth maxWidth="sm">
-        <DialogTitle sx={{ fontWeight: 900 }}>Calcular comisión</DialogTitle>
+    Dialog: Calcular comisión
+   ========================= */}
+      <Dialog
+        open={openCalc}
+        onClose={closeCalculate}
+        fullWidth
+        maxWidth="sm"
+        PaperProps={{
+          sx: {
+            borderRadius: 1,
+            overflow: "hidden",
+          },
+        }}
+      >
+        {/* Header */}
+        <DialogTitle
+          sx={{
+            px: 3,
+            py: 2,
+            fontWeight: 900,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+          }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
+              Calcular comisión
+            </Typography>
+            <Chip size="small" label="CALCULAR" sx={{ fontWeight: 900 }} />
+          </Stack>
 
-        <DialogContent dividers>
+          <Tooltip title="Cerrar">
+            <IconButton onClick={closeCalculate} size="small">
+              <CloseRoundedIcon />
+            </IconButton>
+          </Tooltip>
+        </DialogTitle>
+
+        <Divider />
+
+        <DialogContent
+          sx={{
+            px: 3,
+            py: 2.5,
+            bgcolor: "background.default",
+          }}
+        >
           {!calcForm ? (
             <Stack
               direction="row"
@@ -406,88 +448,124 @@ export default function Runs() {
               <Typography variant="body2">Cargando…</Typography>
             </Stack>
           ) : (
-            <Stack spacing={2} sx={{ pt: 1 }}>
-              <TextField
-                label="Asesor"
-                value={String(calcForm.advisor_id || "")}
-                onChange={(e) => setCalcForm({ advisor_id: e.target.value })}
-                select
-                fullWidth
+            <Stack spacing={2.5} sx={{ pt: 0.5 }}>
+              <Paper
+                variant="outlined"
+                sx={{ p: 2.5, borderRadius: 1, bgcolor: "background.paper" }}
               >
-                <MenuItem value="">Selecciona…</MenuItem>
-                {advisorOptions.map((u) => (
-                  <MenuItem key={u.id} value={String(u.id)}>
-                    {u.full_name} — {u.email}
-                  </MenuItem>
-                ))}
-              </TextField>
+                <Typography sx={{ fontWeight: 900, mb: 2 }}>
+                  Parámetros del cálculo
+                </Typography>
 
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <TextField
-                  label="Año"
-                  type="number"
-                  value={calcForm.cut_year}
-                  onChange={(e) =>
-                    setCalcForm({ cut_year: Number(e.target.value) })
-                  }
-                  fullWidth
-                />
+                <Stack spacing={2}>
+                  <TextField
+                    label="Asesor"
+                    value={String(calcForm.advisor_id || "")}
+                    onChange={(e) =>
+                      setCalcForm({ advisor_id: e.target.value })
+                    }
+                    select
+                    fullWidth
+                  >
+                    <MenuItem value="">Selecciona…</MenuItem>
+                    {advisorOptions.map((u) => (
+                      <MenuItem key={u.id} value={String(u.id)}>
+                        {u.full_name} — {u.email}
+                      </MenuItem>
+                    ))}
+                  </TextField>
 
-                <TextField
-                  label="Mes"
-                  value={calcForm.cut_month}
-                  onChange={(e) =>
-                    setCalcForm({ cut_month: Number(e.target.value) })
-                  }
-                  select
-                  fullWidth
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                    <TextField
+                      label="Año"
+                      type="number"
+                      value={calcForm.cut_year}
+                      onChange={(e) =>
+                        setCalcForm({ cut_year: Number(e.target.value) })
+                      }
+                      fullWidth
+                    />
+
+                    <TextField
+                      label="Mes"
+                      value={calcForm.cut_month}
+                      onChange={(e) =>
+                        setCalcForm({ cut_month: Number(e.target.value) })
+                      }
+                      select
+                      fullWidth
+                    >
+                      {MONTHS.map((m) => (
+                        <MenuItem key={m.value} value={m.value}>
+                          {m.label}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Stack>
+
+                  <TextField
+                    label="Quincena"
+                    value={calcForm.fortnight}
+                    onChange={(e) => setCalcForm({ fortnight: e.target.value })}
+                    select
+                    fullWidth
+                  >
+                    <MenuItem value="FIRST">Primera quincena</MenuItem>
+                    <MenuItem value="SECOND">Segunda quincena</MenuItem>
+                  </TextField>
+
+                  <TextField
+                    label="Notas (opcional)"
+                    value={calcForm.notes || ""}
+                    onChange={(e) => setCalcForm({ notes: e.target.value })}
+                    fullWidth
+                  />
+                </Stack>
+              </Paper>
+
+              {error ? (
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    borderRadius: 1,
+                    borderColor: "error.main",
+                    bgcolor: "error.lighter",
+                  }}
                 >
-                  {MONTHS.map((m) => (
-                    <MenuItem key={m.value} value={m.value}>
-                      {m.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Stack>
-
-              <TextField
-                label="Quincena"
-                value={calcForm.fortnight}
-                onChange={(e) => setCalcForm({ fortnight: e.target.value })}
-                select
-                fullWidth
-              >
-                <MenuItem value="FIRST">Primera quincena</MenuItem>
-                <MenuItem value="SECOND">Segunda quincena</MenuItem>
-              </TextField>
-
-              <TextField
-                label="Notas (opcional)"
-                value={calcForm.notes || ""}
-                onChange={(e) => setCalcForm({ notes: e.target.value })}
-                fullWidth
-              />
+                  <Typography variant="body2" sx={{ color: "error.main" }}>
+                    {error}
+                  </Typography>
+                </Paper>
+              ) : null}
             </Stack>
           )}
-
-          {error ? (
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="body2" sx={{ color: "error.main" }}>
-                {error}
-              </Typography>
-            </Box>
-          ) : null}
         </DialogContent>
 
-        <DialogActions sx={{ px: 2, py: 1.5 }}>
-          <Button onClick={closeCalculate} variant="outlined">
+        <Divider />
+
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 1.5,
+            bgcolor: "background.paper",
+          }}
+        >
+          <Button
+            onClick={closeCalculate}
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
             Cancelar
           </Button>
           <Button
             onClick={submitCalculate}
             variant="contained"
             disabled={isCalculating || !calcForm}
-            sx={{ fontWeight: 900 }}
+            sx={{ fontWeight: 900, borderRadius: 2, px: 2.5 }}
           >
             {isCalculating ? "Calculando…" : "Calcular"}
           </Button>
@@ -495,17 +573,55 @@ export default function Runs() {
       </Dialog>
 
       {/* =========================
-          Dialog: Detalle comisión
-         ========================= */}
+    Dialog: Detalle comisión
+   ========================= */}
       <Dialog
         open={openDetail}
         onClose={closeRunDetail}
         fullWidth
         maxWidth="md"
+        PaperProps={{
+          sx: {
+            borderRadius: 1,
+            overflow: "hidden",
+          },
+        }}
       >
-        <DialogTitle sx={{ fontWeight: 900 }}>Detalle comisión</DialogTitle>
+        {/* Header */}
+        <DialogTitle
+          sx={{
+            px: 3,
+            py: 2,
+            fontWeight: 900,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+          }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.1 }}>
+              Detalle comisión
+            </Typography>
+            <Chip size="small" label="DETALLE" sx={{ fontWeight: 900 }} />
+          </Stack>
 
-        <DialogContent dividers>
+          <Tooltip title="Cerrar">
+            <IconButton onClick={closeRunDetail} size="small">
+              <CloseRoundedIcon />
+            </IconButton>
+          </Tooltip>
+        </DialogTitle>
+
+        <Divider />
+
+        <DialogContent
+          sx={{
+            px: 3,
+            py: 2.5,
+            bgcolor: "background.default",
+          }}
+        >
           {isLoadingDetail ? (
             <Stack
               direction="row"
@@ -517,13 +633,23 @@ export default function Runs() {
               <Typography variant="body2">Cargando detalle…</Typography>
             </Stack>
           ) : !detail?.run ? (
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              No hay información para mostrar.
-            </Typography>
+            <Paper
+              variant="outlined"
+              sx={{ p: 2.5, borderRadius: 1, bgcolor: "background.paper" }}
+            >
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                No hay información para mostrar.
+              </Typography>
+            </Paper>
           ) : (
-            <Stack spacing={2}>
+            <Stack spacing={2.5} sx={{ pt: 0.5 }}>
               {/* Summary */}
-              <Card sx={{ p: 2, borderRadius: 2 }}>
+              <Paper
+                variant="outlined"
+                sx={{ p: 2.5, borderRadius: 1, bgcolor: "background.paper" }}
+              >
+                <Typography sx={{ fontWeight: 900, mb: 2 }}>Resumen</Typography>
+
                 <Stack
                   direction={{ xs: "column", md: "row" }}
                   spacing={2}
@@ -566,7 +692,12 @@ export default function Runs() {
                         ? "(1ra quincena)"
                         : "(2da quincena)"}
                     </Typography>
-                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ mt: 1, flexWrap: "wrap" }}
+                    >
                       {statusChip(detail.run.status)}
                       <Chip
                         size="small"
@@ -592,15 +723,22 @@ export default function Runs() {
                 {detail.run.notes ? (
                   <Typography
                     variant="body2"
-                    sx={{ mt: 1, color: "text.secondary" }}
+                    sx={{ mt: 1.5, color: "text.secondary" }}
                   >
                     Nota: {detail.run.notes}
                   </Typography>
                 ) : null}
-              </Card>
+              </Paper>
 
               {/* Items */}
-              <Card sx={{ borderRadius: 2, overflow: "hidden" }}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  borderRadius: 1,
+                  overflow: "hidden",
+                  bgcolor: "background.paper",
+                }}
+              >
                 <TableContainer>
                   <Table size="small">
                     <TableHead>
@@ -696,21 +834,44 @@ export default function Runs() {
                     </TableBody>
                   </Table>
                 </TableContainer>
-              </Card>
+              </Paper>
+
+              {error ? (
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    borderRadius: 1,
+                    borderColor: "error.main",
+                    bgcolor: "error.lighter",
+                  }}
+                >
+                  <Typography variant="body2" sx={{ color: "error.main" }}>
+                    {error}
+                  </Typography>
+                </Paper>
+              ) : null}
             </Stack>
           )}
-
-          {error ? (
-            <Box sx={{ mt: 1 }}>
-              <Typography variant="body2" sx={{ color: "error.main" }}>
-                {error}
-              </Typography>
-            </Box>
-          ) : null}
         </DialogContent>
 
-        <DialogActions sx={{ px: 2, py: 1.5 }}>
-          <Button onClick={closeRunDetail} variant="outlined">
+        <Divider />
+
+        <DialogActions
+          sx={{
+            px: 3,
+            py: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 1.5,
+            bgcolor: "background.paper",
+          }}
+        >
+          <Button
+            onClick={closeRunDetail}
+            variant="outlined"
+            sx={{ borderRadius: 2 }}
+          >
             Cerrar
           </Button>
         </DialogActions>

@@ -28,19 +28,29 @@ import { DRAWER_WIDTH } from "./MainLayout";
 const navSections = [
   {
     title: "Inicio",
-    items: [{ label: "Dashboard", to: "/dashboard", icon: <HomeRoundedIcon /> }],
+    items: [
+      { label: "Dashboard", to: "/dashboard", icon: <HomeRoundedIcon /> },
+    ],
   },
   {
     title: "Operación",
     items: [
-      { label: "Vehículos", to: "/vehicles", icon: <DirectionsCarRoundedIcon /> },
       { label: "Ventas", to: "/sales", icon: <SellRoundedIcon /> },
+      {
+        label: "Vehículos",
+        to: "/vehicles",
+        icon: <DirectionsCarRoundedIcon />,
+      },
     ],
   },
   {
     title: "Comisiones",
     items: [
-      { label: "Calcular", to: "/commissions/runs", icon: <PaymentsRoundedIcon /> },
+      {
+        label: "Calcular",
+        to: "/commissions/runs",
+        icon: <PaymentsRoundedIcon />,
+      },
       {
         label: "Parámetros",
         to: "/commissions/statements",
@@ -51,7 +61,11 @@ const navSections = [
   {
     title: "Reportes",
     items: [
-      { label: "Exportaciones", to: "/reports/exports", icon: <FileDownloadRoundedIcon /> },
+      {
+        label: "Exportaciones",
+        to: "/reports/exports",
+        icon: <FileDownloadRoundedIcon />,
+      },
     ],
   },
   {
@@ -153,49 +167,11 @@ export default function Sidebar() {
 
       <Divider />
 
-      {/* Session */}
-      <Box sx={{ px: 2, py: 1.5 }}>
-        <StackLikeRow>
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            Sesión
-          </Typography>
-
-          <Chip
-            size="small"
-            label={user?.is_active === false ? "Bloqueado" : "Activa"}
-            sx={{
-              ml: "auto",
-              fontWeight: 900,
-              bgcolor:
-                user?.is_active === false
-                  ? alpha(theme.palette.error.main, 0.14)
-                  : alpha(theme.palette.success.main, 0.14),
-              color:
-                user?.is_active === false
-                  ? theme.palette.error.main
-                  : theme.palette.success.main,
-            }}
-          />
-        </StackLikeRow>
-
-        <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
-          <Chip size="small" label={user?.role || "—"} sx={{ fontWeight: 900 }} />
-          {user?.brands?.slice(0, 2)?.map((b) => (
-            <Chip key={b.brand_id} size="small" label={b.code} variant="outlined" />
-          ))}
-          {(user?.brands?.length || 0) > 2 && (
-            <Chip size="small" label={`+${user.brands.length - 2}`} variant="outlined" />
-          )}
-        </Box>
-      </Box>
-
-      <Divider />
-
       {/* Nav Sections */}
       <Box sx={{ py: 1 }}>
         {navSections.map((section) => {
           const visibleItems = section.items.filter((i) =>
-            i.adminOnly ? isAdmin : true
+            i.adminOnly ? isAdmin : true,
           );
 
           if (!visibleItems.length) return null;
@@ -215,8 +191,7 @@ export default function Sidebar() {
                       to={item.to}
                       sx={{
                         my: 0.5,
-                        borderRadius: 2,
-                        border: `1px solid transparent`,
+                        borderRadius: 0.5,
                         color: active ? "text.primary" : "text.secondary",
                         ...(active && {
                           bgcolor: alpha(theme.palette.primary.main, 0.12),
@@ -228,7 +203,7 @@ export default function Sidebar() {
                             ? alpha(theme.palette.primary.main, 0.16)
                             : alpha(
                                 theme.palette.text.primary,
-                                theme.palette.mode === "dark" ? 0.05 : 0.04
+                                theme.palette.mode === "dark" ? 0.05 : 0.04,
                               ),
                           color: "text.primary",
                         },
@@ -273,5 +248,7 @@ export default function Sidebar() {
 }
 
 function StackLikeRow({ children }) {
-  return <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>{children}</Box>;
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>{children}</Box>
+  );
 }

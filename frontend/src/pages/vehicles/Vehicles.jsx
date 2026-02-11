@@ -115,9 +115,6 @@ export default function Vehicles() {
             <Typography variant="h5" sx={{ fontWeight: 900 }}>
               Vehículos
             </Typography>
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Catálogo + precio + valores por Tabla (KIA primero 🔥)
-            </Typography>
           </Box>
 
           <Stack direction="row" spacing={1}>
