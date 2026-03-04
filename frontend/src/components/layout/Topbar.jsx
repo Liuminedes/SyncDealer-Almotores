@@ -115,7 +115,7 @@ export default function Topbar() {
                 border: `1px solid ${theme.palette.divider}`,
                 bgcolor: "background.paper",
                 backgroundImage: "none",
-                borderRadius: 2,
+                borderRadius: 1,
                 overflow: "hidden",
               },
             }}

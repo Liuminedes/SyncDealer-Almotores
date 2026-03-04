@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 160" width="520" height="160">
+  <defs>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4FC3F7"/>
+      <stop offset="50%" style="stop-color:#1565C0"/>
+      <stop offset="100%" style="stop-color:#0D47A1"/>
+    </linearGradient>
+    <linearGradient id="iconBg" x1="0%" y1="0%" x2="135%" y2="135%">
+      <stop offset="0%" style="stop-color:#1A2744"/>
+      <stop offset="100%" style="stop-color:#0A0F1E"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+    <linearGradient id="borderShimmer" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4FC3F7;stop-opacity:0.8"/>
+      <stop offset="40%" style="stop-color:#1565C0;stop-opacity:0.3"/>
+      <stop offset="100%" style="stop-color:#4FC3F7;stop-opacity:0.6"/>
+    </linearGradient>
+    <linearGradient id="textGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FFFFFF"/>
+      <stop offset="100%" style="stop-color:#CFE4FF"/>
+    </linearGradient>
+    <linearGradient id="lineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4FC3F7;stop-opacity:0"/>
+      <stop offset="30%" style="stop-color:#4FC3F7;stop-opacity:1"/>
+      <stop offset="70%" style="stop-color:#1565C0;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#1565C0;stop-opacity:0"/>
+    </linearGradient>
+    <clipPath id="iconClip">
+      <rect x="10" y="10" width="140" height="140" rx="22"/>
+    </clipPath>
+  </defs>
+
+  <!-- ICON MARK -->
+  <rect x="8" y="8" width="144" height="144" rx="24" fill="url(#borderShimmer)" filter="url(#shadow)"/>
+  <rect x="10" y="10" width="140" height="140" rx="22" fill="url(#iconBg)"/>
+
+  <!-- Grid texture -->
+  <g opacity="0.06" stroke="#4FC3F7" stroke-width="0.8" clip-path="url(#iconClip)">
+    <line x1="10" y1="37" x2="150" y2="37"/>
+    <line x1="10" y1="64" x2="150" y2="64"/>
+    <line x1="10" y1="91" x2="150" y2="91"/>
+    <line x1="10" y1="118" x2="150" y2="118"/>
+    <line x1="37" y1="10" x2="37" y2="150"/>
+    <line x1="64" y1="10" x2="64" y2="150"/>
+    <line x1="91" y1="10" x2="91" y2="150"/>
+    <line x1="118" y1="10" x2="118" y2="150"/>
+  </g>
+
+  <!-- Speed lines -->
+  <g opacity="0.12" stroke="#4FC3F7" stroke-width="1" clip-path="url(#iconClip)">
+    <line x1="10" y1="75" x2="55" y2="75"/>
+    <line x1="10" y1="80" x2="45" y2="80"/>
+    <line x1="10" y1="85" x2="50" y2="85"/>
+  </g>
+
+  <!-- Ground shadow -->
+  <ellipse cx="80" cy="117" rx="38" ry="5" fill="#000000" opacity="0.35"/>
+
+  <!-- Car body -->
+  <path d="M 38 95 L 38 108 Q 38 112 42 112 L 118 112 Q 122 112 122 108 L 122 95 Z" fill="url(#blueGrad)" opacity="0.95"/>
+
+  <!-- Car roof -->
+  <path d="M 52 95 L 58 76 Q 60 72 65 71 L 97 71 Q 102 71 104 76 L 110 95 Z" fill="#1565C0"/>
+
+  <!-- Windshield -->
+  <path d="M 60 93 L 65 77 Q 66 74 69 74 L 93 74 Q 96 74 97 77 L 102 93 Z" fill="#0D47A1" opacity="0.7"/>
+
+  <!-- Windshield glare -->
+  <path d="M 63 91 L 67 78 L 80 78 L 78 91 Z" fill="#4FC3F7" opacity="0.18"/>
+  <path d="M 60 93 L 65 77 L 68 77 L 63 93 Z" fill="#4FC3F7" opacity="0.12"/>
+
+  <!-- Door line -->
+  <line x1="80" y1="95" x2="80" y2="110" stroke="#0D47A1" stroke-width="1" opacity="0.6"/>
+
+  <!-- Front grille -->
+  <rect x="112" y="98" width="8" height="10" rx="2" fill="#0D47A1" opacity="0.8"/>
+  <rect x="113" y="99" width="6" height="3" rx="1" fill="#4FC3F7" opacity="0.9" filter="url(#glow)"/>
+
+  <!-- Rear taillight -->
+  <rect x="40" y="98" width="6" height="8" rx="2" fill="#0D47A1" opacity="0.8"/>
+  <rect x="41" y="100" width="4" height="3" rx="1" fill="#E53935" opacity="0.85"/>
+
+  <!-- Wheel arches -->
+  <path d="M 38 108 Q 38 112 42 112 L 57 112 Q 64 112 64 105 Q 64 98 57 98 L 42 98 Q 38 98 38 105 Z" fill="#0A1428"/>
+  <path d="M 103 98 Q 96 98 96 105 Q 96 112 103 112 L 118 112 Q 122 112 122 108 L 122 105 Q 122 98 118 98 Z" fill="#0A1428"/>
+
+  <!-- Left wheel -->
+  <circle cx="55" cy="108" r="13" fill="#0D1B2A"/>
+  <circle cx="55" cy="108" r="9" fill="#111D2E"/>
+  <circle cx="55" cy="108" r="5.5" fill="url(#blueGrad)" opacity="0.85"/>
+  <circle cx="55" cy="108" r="2" fill="#E8F4FF" opacity="0.7"/>
+  <g stroke="#4FC3F7" stroke-width="1" opacity="0.4">
+    <line x1="55" y1="99" x2="55" y2="103"/><line x1="55" y1="113" x2="55" y2="117"/>
+    <line x1="46" y1="108" x2="50" y2="108"/><line x1="60" y1="108" x2="64" y2="108"/>
+    <line x1="48.7" y1="101.7" x2="51.5" y2="104.5"/><line x1="58.5" y1="111.5" x2="61.3" y2="114.3"/>
+    <line x1="48.7" y1="114.3" x2="51.5" y2="111.5"/><line x1="58.5" y1="104.5" x2="61.3" y2="101.7"/>
+  </g>
+
+  <!-- Right wheel -->
+  <circle cx="105" cy="108" r="13" fill="#0D1B2A"/>
+  <circle cx="105" cy="108" r="9" fill="#111D2E"/>
+  <circle cx="105" cy="108" r="5.5" fill="url(#blueGrad)" opacity="0.85"/>
+  <circle cx="105" cy="108" r="2" fill="#E8F4FF" opacity="0.7"/>
+  <g stroke="#4FC3F7" stroke-width="1" opacity="0.4">
+    <line x1="105" y1="99" x2="105" y2="103"/><line x1="105" y1="113" x2="105" y2="117"/>
+    <line x1="96" y1="108" x2="100" y2="108"/><line x1="110" y1="108" x2="114" y2="108"/>
+    <line x1="98.7" y1="101.7" x2="101.5" y2="104.5"/><line x1="108.5" y1="111.5" x2="111.3" y2="114.3"/>
+    <line x1="98.7" y1="114.3" x2="101.5" y2="111.5"/><line x1="108.5" y1="104.5" x2="111.3" y2="101.7"/>
+  </g>
+
+  <!-- Sync signal arcs above car -->
+  <g filter="url(#glow)" opacity="0.9">
+    <path d="M 57 62 A 23 23 0 0 1 103 62" stroke="#4FC3F7" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M 62 57 A 18 18 0 0 1 98 57" stroke="#1E88E5" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M 67 53 A 13 13 0 0 1 93 53" stroke="#4FC3F7" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+  </g>
+  <circle cx="80" cy="49" r="3" fill="#4FC3F7" filter="url(#glow)" opacity="0.9"/>
+
+  <!-- Corner accent dots -->
+  <circle cx="22" cy="22" r="2" fill="#4FC3F7" opacity="0.4"/>
+  <circle cx="138" cy="22" r="2" fill="#4FC3F7" opacity="0.4"/>
+  <circle cx="22" cy="138" r="2" fill="#4FC3F7" opacity="0.4"/>
+  <circle cx="138" cy="138" r="2" fill="#4FC3F7" opacity="0.4"/>
+
+  <!-- DIVIDER -->
+  <rect x="171" y="28" width="1.5" height="104" rx="1" fill="url(#lineGrad)"/>
+
+  <!-- WORDMARK -->
+  <text x="192" y="82" font-family="'Helvetica Neue', 'Arial Black', Helvetica, sans-serif" font-weight="900" font-size="46" letter-spacing="6" fill="url(#textGrad)">SYNC</text>
+  <rect x="192" y="88" width="220" height="1.5" rx="1" fill="url(#blueGrad)" opacity="0.5"/>
+  <text x="194" y="114" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="300" font-size="22" letter-spacing="14" fill="#4FC3F7" opacity="0.95">DEALER</text>
+  <text x="194" y="133" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif" font-weight="200" font-size="10.5" letter-spacing="7" fill="#4FC3F7" opacity="0.45">ALMOTORES</text>
+</svg>
