@@ -22,9 +22,8 @@ import SchemeBonus from "./SchemeBonus.js";
 
 User.belongsTo(Role, { as: "role", foreignKey: "role_id" });
 Role.hasMany(User, { as: "users", foreignKey: "role_id" });
-
-Branch.belongsTo(Brand, { as: "brand", foreignKey: "brand_id" });
-Brand.hasMany(Branch, { as: "branches", foreignKey: "brand_id" });
+User.belongsTo(Branch, { as: "branch", foreignKey: "branch_id" });
+Branch.hasMany(User,   { as: "users",  foreignKey: "branch_id" });
 
 User.belongsToMany(Brand, {
   through: UserBrandAccess,

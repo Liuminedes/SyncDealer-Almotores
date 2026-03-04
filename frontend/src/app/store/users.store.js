@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { usersApi } from "../../api/users.api";
 import { rolesApi } from "../../api/roles.api";
 import { brandsApi } from "../../api/brands.api";
+import { branchesApi } from "../../api/branches.api";
 
 const initialFilters = {
   page: 1,
@@ -34,6 +35,7 @@ export const useUsersStore = create((set, get) => ({
 
   roles: [],
   brands: [],
+  branches: [],
 
   // UI/State
   filters: { ...initialFilters },
@@ -45,14 +47,12 @@ export const useUsersStore = create((set, get) => ({
   openForm: false,
   formMode: "create",
   formUser: null,
-
-  // Brands for create/edit form (same shape as modal)
-  formBrandsSelection: null, // null=cargando | []=cargado
+  formBrandsSelection: null,
 
   // Brands Modal
   openBrands: false,
   brandsUser: null,
-  brandsSelection: null, // null=cargando | []=cargado
+  brandsSelection: null,
 
   // --- Actions ---
   setFilters: (patch) =>
@@ -64,20 +64,25 @@ export const useUsersStore = create((set, get) => ({
 
   hydrateMeta: async () => {
     try {
-      const [rolesRes, brandsRes] = await Promise.all([rolesApi.list(), brandsApi.list()]);
+      const [rolesRes, brandsRes, branchesRes] = await Promise.all([
+        rolesApi.list(),
+        brandsApi.list(),
+        branchesApi.list().catch(() => ({ data: { items: [] } })), // branches falla gracefully
+      ]);
+
       set({
         roles: rolesRes?.data || [],
-        brands: brandsRes || [],
+        brands: Array.isArray(brandsRes) ? brandsRes : (brandsRes?.data?.items || brandsRes?.data || []),
+        branches: branchesRes?.data?.items || [],
       });
     } catch {
-      set({ roles: [], brands: [] });
+      set({ roles: [], brands: [], branches: [] });
     }
   },
 
   fetchUsers: async () => {
     const { filters } = get();
     set({ isLoading: true, error: null });
-
     try {
       const res = await usersApi.list({
         page: filters.page,
@@ -86,8 +91,8 @@ export const useUsersStore = create((set, get) => ({
         role: filters.role || undefined,
         status: filters.status || undefined,
         brand_id: filters.brand_id || undefined,
+        _t: Date.now(),        // ← rompe el caché del browser
       });
-
       const payload = res?.data || {};
       set({
         items: payload.items || [],
@@ -96,8 +101,7 @@ export const useUsersStore = create((set, get) => ({
         isLoading: false,
       });
     } catch (e) {
-      const msg = e?.response?.data?.message || "No se pudo cargar usuarios";
-      set({ isLoading: false, error: msg });
+      set({ isLoading: false, error: e?.response?.data?.message || "No se pudo cargar usuarios" });
     }
   },
 
@@ -106,32 +110,29 @@ export const useUsersStore = create((set, get) => ({
     set({
       openForm: true,
       formMode: "create",
-      formUser: { full_name: "", email: "", password: "", role_id: "", is_active: true },
+      formUser: {
+        full_name: "", email: "", password: "", role_id: "",
+        document_number: "", phone: "", hire_date: "", branch_id: "",
+        is_active: true,
+      },
       formBrandsSelection: null,
       error: null,
     });
-
     try {
       if (!get().brands?.length) await get().hydrateMeta();
-      const allBrands = get().brands || [];
-      set({ formBrandsSelection: mergeBrandsForSelection(allBrands, []) });
+      set({ formBrandsSelection: mergeBrandsForSelection(get().brands, []) });
     } catch {
       set({ formBrandsSelection: [] });
     }
   },
 
   openEdit: async (user) => {
-    set({
-      openForm: true,
-      formMode: "edit",
-      formUser: null,
-      formBrandsSelection: null,
-      isSaving: false,
-      error: null,
-    });
-
+    set({ openForm: true, formMode: "edit", formUser: null, formBrandsSelection: null, isSaving: false, error: null });
     try {
-      if (!get().brands?.length) await get().hydrateMeta();
+      // Primero asegurar que meta esté cargada
+      if (!get().brands?.length || !get().branches?.length) {
+        await get().hydrateMeta();
+      }
 
       const res = await usersApi.getById(user.id);
       const u = res?.data;
@@ -139,18 +140,20 @@ export const useUsersStore = create((set, get) => ({
       set({
         formUser: {
           id: u.id,
-          full_name: u.full_name,
-          email: u.email,
+          full_name: u.full_name || "",
+          email: u.email || "",
           password: "",
           role_id: u?.role?.id ? String(u.role.id) : "",
+          document_number: u.document_number || "",
+          phone: u.phone || "",
+          hire_date: u.hire_date || "",
+          branch_id: u?.branch?.id ? String(u.branch.id) : "",
           is_active: !!u.is_active,
         },
+        formBrandsSelection: mergeBrandsForSelection(get().brands, u?.brands || []),
       });
-
-      const current = u?.brands || []; // [{brand_id, name, code, can_view, can_generate}]
-      const allBrands = get().brands || [];
-      set({ formBrandsSelection: mergeBrandsForSelection(allBrands, current) });
-    } catch {
+    } catch (e) {
+      console.error("openEdit error:", e);
       set({ openForm: false, formUser: null, formBrandsSelection: null });
     }
   },
@@ -173,98 +176,64 @@ export const useUsersStore = create((set, get) => ({
   submitForm: async () => {
     const { formMode, formUser, formBrandsSelection } = get();
     if (!formUser) return;
-
     set({ isSaving: true, error: null });
-
     try {
+      const basePayload = {
+        full_name: formUser.full_name,
+        email: formUser.email,
+        role_id: Number(formUser.role_id),
+        document_number: formUser.document_number || null,
+        phone: formUser.phone || null,
+        hire_date: formUser.hire_date || null,
+        branch_id: formUser.branch_id ? Number(formUser.branch_id) : null,
+        is_active: !!formUser.is_active,
+      };
+
+      let userId;
+
       if (formMode === "create") {
-        const created = await usersApi.create({
-          full_name: formUser.full_name,
-          email: formUser.email,
-          password: formUser.password,
-          role_id: Number(formUser.role_id),
-          is_active: !!formUser.is_active,
-        });
-
-        // Si el usuario seleccionó marcas en el formulario, las aplicamos (2-step)
-        const userId = created?.data?.id;
-        const rows = Array.isArray(formBrandsSelection) ? formBrandsSelection : [];
-        const payload = rows
-          .filter((b) => b.can_view || b.can_generate)
-          .map((b) => ({
-            brand_id: b.brand_id,
-            can_view: !!b.can_view,
-            can_generate: !!b.can_generate,
-          }));
-
-        if (userId && payload.length) {
-          await usersApi.replaceBrands(userId, payload);
-        }
+        const created = await usersApi.create({ ...basePayload, password: formUser.password });
+        userId = created?.data?.id;
       } else {
-        const payload = {
-          full_name: formUser.full_name,
-          email: formUser.email,
-          role_id: Number(formUser.role_id),
-          is_active: !!formUser.is_active,
-        };
-
-        if (formUser.password?.trim()) payload.password = formUser.password.trim();
-
-        await usersApi.update(formUser.id, payload);
-
-        // También actualizamos marcas desde el mismo form
-        const rows = Array.isArray(formBrandsSelection) ? formBrandsSelection : [];
-        const brandPayload = rows
-          .filter((b) => b.can_view || b.can_generate)
-          .map((b) => ({
-            brand_id: b.brand_id,
-            can_view: !!b.can_view,
-            can_generate: !!b.can_generate,
-          }));
-
-        await usersApi.replaceBrands(formUser.id, brandPayload);
+        if (formUser.password?.trim()) basePayload.password = formUser.password.trim();
+        await usersApi.update(formUser.id, basePayload);
+        userId = formUser.id;
       }
+
+      // Guardar permisos de marca
+      const rows = Array.isArray(formBrandsSelection) ? formBrandsSelection : [];
+      const brandPayload = rows
+        .filter((b) => b.can_view || b.can_generate)
+        .map((b) => ({ brand_id: b.brand_id, can_view: !!b.can_view, can_generate: !!b.can_generate }));
+
+      if (userId) await usersApi.replaceBrands(userId, brandPayload);
 
       set({ isSaving: false, openForm: false, formUser: null, formBrandsSelection: null });
       await get().fetchUsers();
     } catch (e) {
-      const msg = e?.response?.data?.message || "No se pudo guardar el usuario";
-      set({ isSaving: false, error: msg });
+      set({ isSaving: false, error: e?.response?.data?.message || "No se pudo guardar el usuario" });
     }
   },
 
-  // --- Status ---
   toggleStatus: async (user) => {
     try {
       await usersApi.setStatus(user.id, !user.is_active);
       await get().fetchUsers();
     } catch (e) {
-      const msg = e?.response?.data?.message || "No se pudo actualizar el estado";
-      set({ error: msg });
+      set({ error: e?.response?.data?.message || "No se pudo actualizar el estado" });
     }
   },
 
-  // --- Brands Modal (standalone) ---
+  // --- Brands Modal ---
   openBrandsModal: async (user) => {
-    set({
-      openBrands: true,
-      brandsUser: user,
-      brandsSelection: null,
-      isSaving: false,
-      error: null,
-    });
-
+    set({ openBrands: true, brandsUser: user, brandsSelection: null, isSaving: false, error: null });
     try {
       if (!get().brands?.length) await get().hydrateMeta();
-
       const res = await usersApi.getBrands(user.id);
       const current = res?.data || [];
-
-      const allBrands = get().brands || [];
-      set({ brandsSelection: mergeBrandsForSelection(allBrands, current) });
+      set({ brandsSelection: mergeBrandsForSelection(get().brands, current) });
     } catch (e) {
-      const msg = e?.response?.data?.message || "No se pudieron cargar permisos por marca";
-      set({ error: msg, brandsSelection: [] });
+      set({ error: e?.response?.data?.message || "No se pudieron cargar permisos por marca", brandsSelection: [] });
     }
   },
 
@@ -283,26 +252,16 @@ export const useUsersStore = create((set, get) => ({
   saveBrands: async () => {
     const { brandsUser, brandsSelection } = get();
     if (!brandsUser) return;
-
     set({ isSaving: true, error: null });
-
     try {
-      const rows = Array.isArray(brandsSelection) ? brandsSelection : [];
-      const payload = rows
+      const payload = (Array.isArray(brandsSelection) ? brandsSelection : [])
         .filter((b) => b.can_view || b.can_generate)
-        .map((b) => ({
-          brand_id: b.brand_id,
-          can_view: !!b.can_view,
-          can_generate: !!b.can_generate,
-        }));
-
+        .map((b) => ({ brand_id: b.brand_id, can_view: !!b.can_view, can_generate: !!b.can_generate }));
       await usersApi.replaceBrands(brandsUser.id, payload);
-
       set({ isSaving: false, openBrands: false, brandsUser: null, brandsSelection: null });
       await get().fetchUsers();
     } catch (e) {
-      const msg = e?.response?.data?.message || "No se pudieron guardar permisos por marca";
-      set({ isSaving: false, error: msg });
+      set({ isSaving: false, error: e?.response?.data?.message || "No se pudieron guardar permisos por marca" });
     }
   },
 }));

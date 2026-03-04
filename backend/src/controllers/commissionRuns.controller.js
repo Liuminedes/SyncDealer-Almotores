@@ -1,5 +1,63 @@
+// commissionRuns.controller.js — versión final con policyEngine integrado
 import { sequelize } from "../config/db.js";
 import { HttpError } from "../utils/httpError.js";
+import { evaluatePolicy } from "../utils/policyEngine.js";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Construye el contexto necesario para evaluar condiciones.
+ * Hace las queries de vacaciones y hire_date una sola vez.
+ */
+async function buildEvaluationContext({ advisorId, unitsTotal, salesRows, from, cutEnd, t }) {
+  // Unidades por vehículo (para condiciones MIN_UNITS_OF_VEHICLE / EXACT_UNITS_OF_VEHICLE)
+  const unitsByVehicle = new Map();
+  for (const s of salesRows || []) {
+    const vid = Number(s.vehicle_id);
+    unitsByVehicle.set(vid, (unitsByVehicle.get(vid) || 0) + 1);
+  }
+
+  // Vacaciones activas que se cruzan con el período
+  const [vacRows] = await sequelize.query(
+    `SELECT id FROM advisor_vacations
+     WHERE advisor_id = :advisor_id AND is_active = 1
+       AND start_date <= :cut_end AND end_date >= :cut_start
+     LIMIT 1`,
+    { replacements: { advisor_id: advisorId, cut_start: from, cut_end: cutEnd }, transaction: t }
+  );
+  const isOnVacation = (vacRows?.length || 0) > 0;
+
+  // Antigüedad en meses respecto al inicio del período
+  const [advisorRows] = await sequelize.query(
+    `SELECT hire_date FROM users WHERE id = :advisor_id LIMIT 1`,
+    { replacements: { advisor_id: advisorId }, transaction: t }
+  );
+  const hireDate = advisorRows?.[0]?.hire_date;
+  let tenureMonths = null;
+  if (hireDate) {
+    const hire    = new Date(hireDate);
+    const cutDate = new Date(from);
+    tenureMonths  =
+      (cutDate.getFullYear() - hire.getFullYear()) * 12 +
+      (cutDate.getMonth() - hire.getMonth());
+    if (tenureMonths < 0) tenureMonths = 0;
+  }
+
+  return { unitsTotal, unitsByVehicle, isOnVacation, tenureMonths };
+}
+
+/**
+ * Parsea conditions de BD (puede venir como string JSON o array).
+ */
+function parseConditions(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") {
+    try { return JSON.parse(raw); } catch { return []; }
+  }
+  return [];
+}
+
+// ─── Controllers ──────────────────────────────────────────────────────────────
 
 export async function listRuns(req, res, next) {
   try {
@@ -7,8 +65,8 @@ export async function listRuns(req, res, next) {
     const brandCode = (req.brand?.code || q.brand || "").toUpperCase();
     if (!brandCode) throw new HttpError(400, "Marca requerida");
 
-    const page = Number(q.page || 1);
-    const limit = Number(q.limit || 10);
+    const page   = Number(q.page  || 1);
+    const limit  = Number(q.limit || 10);
     const offset = (page - 1) * limit;
 
     const replacements = {
@@ -30,7 +88,8 @@ export async function listRuns(req, res, next) {
     `;
 
     const [countRows] = await sequelize.query(
-      `SELECT COUNT(*) as total FROM commission_runs cr JOIN brands b ON b.id = cr.brand_id ${where}`,
+      `SELECT COUNT(*) as total FROM commission_runs cr
+       JOIN brands b ON b.id = cr.brand_id ${where}`,
       { replacements }
     );
 
@@ -52,8 +111,8 @@ export async function listRuns(req, res, next) {
 
 export async function getRunById(req, res, next) {
   try {
-    const p = req.validated?.params || req.params;
-    const runId = Number(p.id);
+    const p         = req.validated?.params || req.params;
+    const runId     = Number(p.id);
     const brandCode = (req.brand?.code || req.query.brand || "").toUpperCase();
     if (!brandCode) throw new HttpError(400, "Marca requerida");
 
@@ -88,7 +147,7 @@ export async function getRunById(req, res, next) {
 export async function calculateRun(req, res, next) {
   const t = await sequelize.transaction();
   try {
-    const b = req.validated?.body || req.body;
+    const b         = req.validated?.body || req.body;
     const brandCode = (req.brand?.code || req.query.brand || "").toUpperCase();
     if (!brandCode) throw new HttpError(400, "Marca requerida");
 
@@ -102,7 +161,7 @@ export async function calculateRun(req, res, next) {
     if (!["FIRST", "SECOND"].includes(fortnight))
       throw new HttpError(400, "fortnight inválido");
 
-    // 1) Brand
+    // ── 1) Brand ──────────────────────────────────────────────────────────────
     const [brandRows] = await sequelize.query(
       `SELECT id FROM brands WHERE code = :brand_code LIMIT 1`,
       { replacements: { brand_code: brandCode }, transaction: t }
@@ -110,22 +169,25 @@ export async function calculateRun(req, res, next) {
     const brandId = brandRows?.[0]?.id;
     if (!brandId) throw new HttpError(400, `Marca no encontrada (${brandCode})`);
 
-    // 2) Corrida existente
+    // ── 2) Corrida existente ──────────────────────────────────────────────────
     const [existingRows] = await sequelize.query(
       `SELECT id, status FROM commission_runs
        WHERE brand_id = :brand_id AND advisor_id = :advisor_id
          AND cut_year = :cut_year AND cut_month = :cut_month AND fortnight = :fortnight
        LIMIT 1`,
-      { replacements: { brand_id: brandId, advisor_id: advisorId, cut_year: cutYear, cut_month: cutMonth, fortnight }, transaction: t }
+      {
+        replacements: { brand_id: brandId, advisor_id: advisorId, cut_year: cutYear, cut_month: cutMonth, fortnight },
+        transaction: t,
+      }
     );
 
-    let runId = existingRows?.[0]?.id || null;
+    let runId          = existingRows?.[0]?.id || null;
     const existingStatus = existingRows?.[0]?.status;
 
     if (runId && ["APPROVED", "PAID"].includes(String(existingStatus)))
       throw new HttpError(409, `No se puede recalcular una corrida en estado ${existingStatus}`);
 
-    // 3) Scheme activo
+    // ── 3) Scheme activo ──────────────────────────────────────────────────────
     const [schemeRows] = await sequelize.query(
       `SELECT cs.id, cs.scheme_type
        FROM commission_schemes cs JOIN brands b ON b.id = cs.brand_id
@@ -140,15 +202,16 @@ export async function calculateRun(req, res, next) {
 
     const isRanges = schemeType === "KIA_PLAN";
 
-    // 4) Rango de fechas del mes vencido
+    // ── 4) Período del mes vencido ────────────────────────────────────────────
     let targetYear  = cutYear;
     let targetMonth = cutMonth - 1;
     if (targetMonth <= 0) { targetMonth = 12; targetYear = cutYear - 1; }
 
     const from           = new Date(targetYear, targetMonth - 1, 1);
     const nextMonthStart = new Date(targetYear, targetMonth, 1);
+    const cutEnd         = new Date(targetYear, targetMonth - 1, 31);
 
-    // 5) Ventas del período
+    // ── 5) Ventas del período ─────────────────────────────────────────────────
     const [salesRows] = await sequelize.query(
       `SELECT s.id as sale_id, s.vehicle_id, v.sale_price
        FROM sales s JOIN vehicles v ON v.id = s.vehicle_id
@@ -160,51 +223,43 @@ export async function calculateRun(req, res, next) {
 
     const unitsTotal = salesRows?.length || 0;
 
-    // 6) Reglas obligatorias → ¿hay tier forzado?
-    let forcedTierName = null;
+    // ── 6) Construir contexto de evaluación ───────────────────────────────────
+    const ctx = await buildEvaluationContext({
+      advisorId, unitsTotal, salesRows, from, cutEnd, t,
+    });
 
+    // ── 7) Leer reglas activas y aplicar con policyEngine ─────────────────────
     const [activeRules] = await sequelize.query(
-      `SELECT rule_type, force_tier_name FROM scheme_rules
-       WHERE scheme_id = :scheme_id AND is_active = 1`,
+      `SELECT id, name, conditions, effect_type, effect_value, priority
+       FROM scheme_rules
+       WHERE scheme_id = :scheme_id AND is_active = 1
+       ORDER BY priority DESC, id ASC`,
       { replacements: { scheme_id: schemeId }, transaction: t }
     );
 
+    let forcedTierName   = null;
+    let fixedAdjustment  = 0;          // suma o resta de reglas FIXED_ADD / FIXED_SUBTRACT
+    const appliedRules   = [];
+
     for (const rule of activeRules || []) {
+      const conditions = parseConditions(rule.conditions);
+      const matches    = evaluatePolicy(conditions, ctx);
 
-      if (rule.rule_type === "VACATION_TIER_OVERRIDE") {
-        const [vacRows] = await sequelize.query(
-          `SELECT id FROM advisor_vacations
-           WHERE advisor_id = :advisor_id AND is_active = 1
-             AND start_date <= :cut_end AND end_date >= :cut_start
-           LIMIT 1`,
-          {
-            replacements: {
-              advisor_id: advisorId,
-              cut_start:  from,
-              cut_end:    new Date(targetYear, targetMonth - 1, 31),
-            },
-            transaction: t,
-          }
-        );
-        if (vacRows?.length > 0) forcedTierName = rule.force_tier_name;
-      }
+      if (!matches) continue;
 
-      if (rule.rule_type === "NEW_ADVISOR_TIER_OVERRIDE") {
-        const [advisorRows] = await sequelize.query(
-          `SELECT hire_date FROM users WHERE id = :advisor_id LIMIT 1`,
-          { replacements: { advisor_id: advisorId }, transaction: t }
-        );
-        const hireDate = advisorRows?.[0]?.hire_date;
-        if (hireDate) {
-          const cutDate         = new Date(targetYear, targetMonth - 1, 1);
-          const threeMonthsBack = new Date(cutDate);
-          threeMonthsBack.setMonth(threeMonthsBack.getMonth() - 3);
-          if (new Date(hireDate) >= threeMonthsBack) forcedTierName = rule.force_tier_name;
-        }
+      appliedRules.push(rule.name);
+
+      if (rule.effect_type === "FORCE_TIER") {
+        // Gana la regla de mayor prioridad (ya vienen ordenadas DESC)
+        if (!forcedTierName) forcedTierName = rule.effect_value;
+      } else if (rule.effect_type === "FIXED_ADD") {
+        fixedAdjustment += Number(rule.effect_value || 0);
+      } else if (rule.effect_type === "FIXED_SUBTRACT") {
+        fixedAdjustment -= Number(rule.effect_value || 0);
       }
     }
 
-    // 7) Resolver tier (forzado o por unidades)
+    // ── 8) Resolver tier ──────────────────────────────────────────────────────
     let tierId = null;
 
     if (forcedTierName) {
@@ -226,7 +281,7 @@ export async function calculateRun(req, res, next) {
       tierId = tierRows?.[0]?.id || null;
     }
 
-    // 8) Crear o limpiar corrida
+    // ── 9) Crear o limpiar corrida ────────────────────────────────────────────
     if (!runId) {
       const [ins] = await sequelize.query(
         `INSERT INTO commission_runs
@@ -257,11 +312,12 @@ export async function calculateRun(req, res, next) {
       );
     }
 
-    // 9) Calcular items
+    // ── 10) Calcular items por modalidad ──────────────────────────────────────
     let totalCommission = 0;
-    const itemNote = forcedTierName ? `Tier forzado por regla: ${forcedTierName}` : null;
+    const itemNote = forcedTierName ? `Tier forzado: ${forcedTierName}` : null;
 
     if (isRanges) {
+      // RANGES: monto fijo por vehículo según tier
       const rateByVehicleId = new Map();
 
       if (tierId && unitsTotal > 0) {
@@ -288,7 +344,9 @@ export async function calculateRun(req, res, next) {
             replacements: {
               run_id: runId, sale_id: s.sale_id, vehicle_id: vehicleId,
               tier_id: tierId, rate_amount: amount,
-              notes: tierId == null ? "Tier no encontrado" : amount === 0 ? "Rate no encontrado" : itemNote,
+              notes: tierId == null   ? "Tier no encontrado"
+                   : amount === 0    ? "Rate no encontrado para este vehículo/tier"
+                   : itemNote,
             },
             transaction: t,
           }
@@ -296,6 +354,7 @@ export async function calculateRun(req, res, next) {
       }
 
     } else {
+      // PERCENTAGES: porcentaje del sale_price según tier
       let pct = 0;
       if (tierId) {
         const [pctRows] = await sequelize.query(
@@ -320,10 +379,10 @@ export async function calculateRun(req, res, next) {
             replacements: {
               run_id: runId, sale_id: s.sale_id, vehicle_id: vehicleId,
               tier_id: tierId, rate_amount: amount,
-              notes: tierId == null ? "Tier no encontrado"
-                : salePrice <= 0 ? "Vehículo sin sale_price"
-                : pct <= 0 ? "Porcentaje no configurado"
-                : itemNote,
+              notes: tierId == null  ? "Tier no encontrado"
+                   : salePrice <= 0 ? "Vehículo sin sale_price"
+                   : pct <= 0       ? "Porcentaje no configurado para este tier"
+                   : itemNote,
             },
             transaction: t,
           }
@@ -331,44 +390,59 @@ export async function calculateRun(req, res, next) {
       }
     }
 
-    // 10) Bonos opcionales
-    let totalBonuses     = 0;
-    const appliedBonuses = [];
+    // ── 11) Aplicar ajuste fijo de reglas (FIXED_ADD / FIXED_SUBTRACT) ────────
+    totalCommission += fixedAdjustment;
 
+    // ── 12) Evaluar bonos activos con policyEngine ────────────────────────────
     const [activeBonuses] = await sequelize.query(
-      `SELECT id, name, min_units, bonus_amount FROM scheme_bonuses
+      `SELECT id, name, conditions, bonus_amount
+       FROM scheme_bonuses
        WHERE scheme_id = :scheme_id AND is_active = 1
-       ORDER BY min_units ASC`,
+       ORDER BY priority DESC, id ASC`,
       { replacements: { scheme_id: schemeId }, transaction: t }
     );
 
+    let totalBonuses     = 0;
+    const appliedBonuses = [];
+
     for (const bonus of activeBonuses || []) {
-      if (unitsTotal >= Number(bonus.min_units)) {
-        const amt = Number(bonus.bonus_amount);
-        totalBonuses += amt;
-        appliedBonuses.push({ name: bonus.name, amount: amt });
-      }
+      const conditions = parseConditions(bonus.conditions);
+      const matches    = evaluatePolicy(conditions, ctx);
+
+      if (!matches) continue;
+
+      const amt = Number(bonus.bonus_amount || 0);
+      totalBonuses += amt;
+      appliedBonuses.push({ name: bonus.name, amount: amt });
     }
+
     totalCommission += totalBonuses;
 
-    // 11) Update final
+    // ── 13) Update final de la corrida ────────────────────────────────────────
     const notesArr = [];
-    if (forcedTierName) notesArr.push(`Regla: ${forcedTierName}`);
+    if (appliedRules.length)
+      notesArr.push(`Reglas: ${appliedRules.join(", ")}`);
+    if (fixedAdjustment !== 0)
+      notesArr.push(`Ajuste reglas: ${fixedAdjustment > 0 ? "+" : ""}$${fixedAdjustment.toLocaleString("es-CO")}`);
     if (appliedBonuses.length)
       notesArr.push(`Bonos: ${appliedBonuses.map((bo) => `${bo.name}(+$${bo.amount.toLocaleString("es-CO")})`).join(", ")}`);
 
     await sequelize.query(
       `UPDATE commission_runs
-       SET scheme_id = :scheme_id, units_total = :units_total,
-           total_commission = :total_commission, status = 'CALCULATED',
-           notes = :notes, updated_at = NOW()
+       SET scheme_id        = :scheme_id,
+           units_total      = :units_total,
+           total_commission = :total_commission,
+           status           = 'CALCULATED',
+           notes            = :notes,
+           updated_at       = NOW()
        WHERE id = :run_id`,
       {
         replacements: {
-          scheme_id: schemeId, units_total: unitsTotal,
-          total_commission: totalCommission,
-          notes: notesArr.length ? notesArr.join(" | ") : (b.notes || null),
-          run_id: runId,
+          scheme_id:        schemeId,
+          units_total:      unitsTotal,
+          total_commission: Math.max(0, totalCommission), // nunca negativo
+          notes:            notesArr.length ? notesArr.join(" | ") : (b.notes || null),
+          run_id:           runId,
         },
         transaction: t,
       }
@@ -377,18 +451,24 @@ export async function calculateRun(req, res, next) {
     await t.commit();
 
     res.json({
-      ok: true,
+      ok:      true,
       message: "Corrida calculada",
       data: {
         run_id:           runId,
         units_total:      unitsTotal,
-        total_commission: Number(totalCommission.toFixed(2)),
+        total_commission: Number(Math.max(0, totalCommission).toFixed(2)),
         total_bonuses:    Number(totalBonuses.toFixed(2)),
+        fixed_adjustment: fixedAdjustment,
+        applied_rules:    appliedRules,
         applied_bonuses:  appliedBonuses,
         forced_tier:      forcedTierName || null,
-        scheme_id:        schemeId,
-        tier_id:          tierId,
-        scheme_type:      schemeType,
+        advisor_context: {
+          is_on_vacation: ctx.isOnVacation,
+          tenure_months:  ctx.tenureMonths,
+        },
+        scheme_id:   schemeId,
+        tier_id:     tierId,
+        scheme_type: schemeType,
       },
     });
   } catch (err) {
@@ -399,9 +479,8 @@ export async function calculateRun(req, res, next) {
 
 export async function updateRunStatus(req, res, next) {
   try {
-    const p = req.validated?.params || req.params;
-    const b = req.validated?.body || req.body;
-
+    const p         = req.validated?.params || req.params;
+    const b         = req.validated?.body   || req.body;
     const runId     = Number(p.id);
     const status    = String(b.status || "").toUpperCase();
     const brandCode = (req.brand?.code || req.query.brand || "").toUpperCase();
