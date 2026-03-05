@@ -71,10 +71,12 @@ export async function listUsers(query = {}) {
       { full_name: { [Op.like]: `%${q}%` } },
       { email: { [Op.like]: `%${q}%` } },
       { document_number: { [Op.like]: `%${q}%` } },
+      { phone: { [Op.like]: `%${q}%` } },  // ← nuevo
     ];
   }
   if (status === "active") where.is_active = true;
   if (status === "inactive") where.is_active = false;
+  if (query.branch_id) where.branch_id = Number(query.branch_id); // ← nuevo
 
   const include = [
     {

@@ -11,6 +11,7 @@ const initialFilters = {
   role: "",
   status: "",
   brand_id: "",
+  branch_id: "",
 };
 
 function mergeBrandsForSelection(allBrands = [], current = []) {

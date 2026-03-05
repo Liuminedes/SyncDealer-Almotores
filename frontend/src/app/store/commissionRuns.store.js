@@ -57,6 +57,7 @@ export const useCommissionRunsStore = create((set, get) => ({
     isLoading: false,
     isCalculating: false,
     isLoadingDetail: false,
+    isDeleting: false,       // ← nuevo
     error: null,
 
     // Dialogs
@@ -66,6 +67,9 @@ export const useCommissionRunsStore = create((set, get) => ({
     openDetail: false,
     detail: null,
     detailId: null,
+
+    openConfirmDelete: false,  // ← nuevo: dialog de confirmación
+    deleteTargetId: null,      // ← nuevo: id a eliminar
 
     // ======================
     // HELPERS
@@ -105,14 +109,7 @@ export const useCommissionRunsStore = create((set, get) => ({
     // ======================
     fetchAdvisors: async () => {
         try {
-            // 🔥 IMPORTANTÍSIMO: tu backend NO acepta limit=200 (te da 400)
-            // En ventas funciona porque usas limit=100.
-            const res = await usersApi.list({
-                role: "ADVISOR",
-                limit: 100,
-                page: 1,
-            });
-
+            const res = await usersApi.list({ role: "ADVISOR", limit: 100, page: 1 });
             const items = res?.data?.items ?? [];
             set({ advisors: items });
         } catch (error) {
@@ -122,7 +119,6 @@ export const useCommissionRunsStore = create((set, get) => ({
     },
 
     hydrateMeta: async () => {
-        // Brands
         try {
             const res = await brandsApi.list();
             const root = res?.data ?? res;
@@ -131,8 +127,6 @@ export const useCommissionRunsStore = create((set, get) => ({
         } catch {
             set({ brands: [] });
         }
-
-        // Advisors
         await get().fetchAdvisors();
     },
 
@@ -142,10 +136,8 @@ export const useCommissionRunsStore = create((set, get) => ({
     fetchRuns: async () => {
         const { filters } = get();
         set({ isLoading: true, error: null });
-
         try {
             const brandCode = get().getBrandCode();
-
             const res = await commissionRunsApi.list({
                 brand: brandCode,
                 page: filters.page,
@@ -156,12 +148,10 @@ export const useCommissionRunsStore = create((set, get) => ({
                 advisor_id: filters.advisor_id ? Number(filters.advisor_id) : undefined,
                 status: filters.status || undefined,
             });
-
             const { items, total, totalPages } = normalizeListResponse(res);
             set({ items, total, totalPages, isLoading: false });
         } catch (e) {
-            const msg =
-                e?.response?.data?.message || "No se pudieron cargar las comisiones";
+            const msg = e?.response?.data?.message || "No se pudieron cargar las comisiones";
             set({ isLoading: false, error: msg });
         }
     },
@@ -194,12 +184,9 @@ export const useCommissionRunsStore = create((set, get) => ({
     submitCalculate: async () => {
         const { calcForm } = get();
         if (!calcForm) return;
-
         set({ isCalculating: true, error: null });
-
         try {
             const brandCode = get().getBrandCode();
-
             const payload = {
                 advisor_id: Number(calcForm.advisor_id),
                 cut_year: Number(calcForm.cut_year),
@@ -207,16 +194,13 @@ export const useCommissionRunsStore = create((set, get) => ({
                 fortnight: String(calcForm.fortnight || "").toUpperCase(),
             };
             const notes = String(calcForm.notes || "").trim();
-            if (notes) payload.notes = notes; // ✅ solo si hay algo
+            if (notes) payload.notes = notes;
 
             if (!payload.advisor_id) throw new Error("Selecciona un asesor");
-            if (!payload.cut_year || !payload.cut_month)
-                throw new Error("Selecciona año y mes");
-            if (!["FIRST", "SECOND"].includes(payload.fortnight))
-                throw new Error("Quincena inválida");
+            if (!payload.cut_year || !payload.cut_month) throw new Error("Selecciona año y mes");
+            if (!["FIRST", "SECOND"].includes(payload.fortnight)) throw new Error("Quincena inválida");
 
             const res = await commissionRunsApi.calculate(payload, { brand: brandCode });
-
             const runId =
                 res?.data?.run_id ??
                 res?.data?.data?.run_id ??
@@ -225,12 +209,10 @@ export const useCommissionRunsStore = create((set, get) => ({
                 null;
 
             set({ isCalculating: false, openCalc: false, calcForm: null });
-
             await get().fetchRuns();
             if (runId) await get().openRunDetail(runId);
         } catch (e) {
-            const msg =
-                e?.response?.data?.message || e?.message || "No se pudo calcular la comisión";
+            const msg = e?.response?.data?.message || e?.message || "No se pudo calcular la comisión";
             set({ isCalculating: false, error: msg });
         }
     },
@@ -239,34 +221,41 @@ export const useCommissionRunsStore = create((set, get) => ({
     // DETAIL
     // ======================
     openRunDetail: async (id) => {
-        set({
-            openDetail: true,
-            detail: null,
-            detailId: id,
-            isLoadingDetail: true,
-            error: null,
-        });
-
+        set({ openDetail: true, detail: null, detailId: id, isLoadingDetail: true, error: null });
         try {
             const brandCode = get().getBrandCode();
             const res = await commissionRunsApi.getById(id, { brand: brandCode });
-
-            set({
-                detail: res?.data ?? res,
-                isLoadingDetail: false,
-            });
+            set({ detail: res?.data ?? res, isLoadingDetail: false });
         } catch (e) {
-            const msg =
-                e?.response?.data?.message || "No se pudo cargar el detalle";
-            set({
-                isLoadingDetail: false,
-                error: msg,
-                openDetail: false,
-                detail: null,
-            });
+            const msg = e?.response?.data?.message || "No se pudo cargar el detalle";
+            set({ isLoadingDetail: false, error: msg, openDetail: false, detail: null });
         }
     },
 
     closeRunDetail: () =>
         set({ openDetail: false, detail: null, detailId: null }),
+
+    // ======================
+    // DELETE
+    // ======================
+    promptDeleteRun: (id) =>
+        set({ openConfirmDelete: true, deleteTargetId: id, error: null }),
+
+    cancelDeleteRun: () =>
+        set({ openConfirmDelete: false, deleteTargetId: null }),
+
+    confirmDeleteRun: async () => {
+        const { deleteTargetId } = get();
+        if (!deleteTargetId) return;
+        set({ isDeleting: true, error: null });
+        try {
+            const brandCode = get().getBrandCode();
+            await commissionRunsApi.delete(deleteTargetId, { brand: brandCode });
+            set({ isDeleting: false, openConfirmDelete: false, deleteTargetId: null });
+            await get().fetchRuns();
+        } catch (e) {
+            const msg = e?.response?.data?.message || "No se pudo eliminar la comisión";
+            set({ isDeleting: false, error: msg });
+        }
+    },
 }));
