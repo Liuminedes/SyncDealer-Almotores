@@ -85,3 +85,85 @@ export async function replaceUserBrands(req, res, next) {
     next(err);
   }
 }
+
+// ── listAdvisorsForBrandOp — asesores de la marca del BrandOp ─────────────
+export async function listAdvisorsForBrandOp(req, res, next) {
+  try {
+    const opUserId = req.user.id;
+
+    const [advisors] = await sequelize.query(
+      `SELECT
+         u.id, u.full_name, u.email, u.phone, u.document_number,
+         u.hire_date, u.is_active,
+         br.name AS branch_name
+       FROM users u
+       JOIN roles r ON r.id = u.role_id
+       JOIN user_brand_access uba_advisor ON uba_advisor.user_id = u.id
+       JOIN user_brand_access uba_op      ON uba_op.brand_id = uba_advisor.brand_id
+         AND uba_op.user_id = :opUserId
+       LEFT JOIN branches br ON br.id = u.branch_id
+       WHERE r.name = 'ADVISOR'
+         AND u.is_active = 1
+       ORDER BY u.full_name ASC`,
+      { replacements: { opUserId } }
+    );
+
+    res.json({ ok: true, data: { items: advisors, total: advisors.length } });
+  } catch (err) { next(err); }
+}
+
+// ── updateAdvisorVacationOnly — BrandOp solo puede modificar vacaciones ────
+// Body esperado: { is_on_vacation: true/false }
+// Esto es diferente al CRUD de AdvisorVacation (crear ausencias con fechas).
+// Este endpoint es para el toggle rápido de estado de vacaciones del asesor.
+export async function updateAdvisorVacationOnly(req, res, next) {
+  try {
+    const advisorId    = Number(req.params.id);
+    const is_on_vacation = req.body?.is_on_vacation;
+
+    if (typeof is_on_vacation !== "boolean")
+      throw new HttpError(400, "Campo requerido: is_on_vacation (boolean)");
+
+    // Verificar que el usuario es un ADVISOR activo
+    const [rows] = await sequelize.query(
+      `SELECT u.id FROM users u
+       JOIN roles r ON r.id = u.role_id
+       WHERE u.id = :advisorId AND r.name = 'ADVISOR' AND u.is_active = 1 LIMIT 1`,
+      { replacements: { advisorId } }
+    );
+    if (!rows?.[0]) throw new HttpError(404, "Asesor no encontrado");
+
+    // Nota: la columna is_on_vacation debe existir en la tabla users
+    // Si no existe, se gestiona a través de la tabla advisor_vacations
+    // En ese caso este endpoint crea/desactiva una entrada de vacaciones
+    const today = new Date().toISOString().slice(0, 10);
+
+    if (is_on_vacation) {
+      // Crear entrada de vacación activa si no existe una vigente
+      await sequelize.query(
+        `INSERT INTO advisor_vacations (advisor_id, start_date, end_date, is_active, notes, created_at, updated_at)
+         SELECT :advisorId, :today, '2099-12-31', 1, 'Activado manualmente', NOW(), NOW()
+         WHERE NOT EXISTS (
+           SELECT 1 FROM advisor_vacations
+           WHERE advisor_id = :advisorId AND is_active = 1
+             AND start_date <= :today AND end_date >= :today
+         )`,
+        { replacements: { advisorId, today } }
+      );
+    } else {
+      // Desactivar todas las vacaciones activas del asesor
+      await sequelize.query(
+        `UPDATE advisor_vacations
+         SET is_active = 0, end_date = :today, updated_at = NOW()
+         WHERE advisor_id = :advisorId AND is_active = 1 AND end_date >= :today`,
+        { replacements: { advisorId, today } }
+      );
+    }
+
+    res.json({
+      ok: true,
+      message: is_on_vacation ? "Asesor marcado en vacaciones" : "Vacaciones desactivadas",
+      data: { id: advisorId, is_on_vacation },
+    });
+  } catch (err) { next(err); }
+}

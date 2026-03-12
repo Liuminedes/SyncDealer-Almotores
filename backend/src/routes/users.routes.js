@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { requireAuth } from "../middlewares/auth.middleware.js";
-import { requireRole } from "../middlewares/permissions.middleware.js";
+import {
+  requireRole,
+  requireBrandOpForAdvisor,
+} from "../middlewares/permissions.middleware.js";
 import { validate } from "../middlewares/validate.middleware.js";
 
 import {
@@ -11,6 +14,8 @@ import {
   setUserStatus,
   getUserBrands,
   replaceUserBrands,
+  listAdvisorsForBrandOp,
+  updateAdvisorVacationOnly,
 } from "../controllers/users.controller.js";
 
 import {
@@ -24,18 +29,33 @@ import {
 
 const router = Router();
 
-// ✅ Solo ADMIN gestiona usuarios
-router.use(requireAuth, requireRole("ADMIN"));
+// ── Rutas exclusivas ADMIN ─────────────────────────────────────────────────
+router.get(   "/",           requireAuth, requireRole("ADMIN"), validate(listUsersSchema),        listUsers);
+router.get(   "/:id",        requireAuth, requireRole("ADMIN"), validate(userIdParamSchema),       getUserById);
+router.post(  "/",           requireAuth, requireRole("ADMIN"), validate(createUserSchema),        createUser);
+router.put(   "/:id",        requireAuth, requireRole("ADMIN"), validate(updateUserSchema),        updateUser);
+router.patch( "/:id/status", requireAuth, requireRole("ADMIN"), validate(setStatusSchema),         setUserStatus);
+router.get(   "/:id/brands", requireAuth, requireRole("ADMIN"), validate(userIdParamSchema),       getUserBrands);
+router.put(   "/:id/brands", requireAuth, requireRole("ADMIN"), validate(replaceUserBrandsSchema), replaceUserBrands);
 
-router.get("/", validate(listUsersSchema), listUsers);
-router.get("/:id", validate(userIdParamSchema), getUserById);
+// ── Rutas ASSISTANT_SALES / BRAND_MANAGER ─────────────────────────────────
+// Solo pueden ver asesores de su propia marca y modificar únicamente vacaciones
 
-router.post("/", validate(createUserSchema), createUser);
-router.put("/:id", validate(updateUserSchema), updateUser);
+// GET /api/users/brand-advisors — lista asesores de su marca
+router.get(
+  "/brand-advisors",
+  requireAuth,
+  requireRole("ASSISTANT_SALES", "BRAND_MANAGER"),
+  listAdvisorsForBrandOp
+);
 
-router.patch("/:id/status", validate(setStatusSchema), setUserStatus);
-
-router.get("/:id/brands", validate(userIdParamSchema), getUserBrands);
-router.put("/:id/brands", validate(replaceUserBrandsSchema), replaceUserBrands);
+// PATCH /api/users/:id/vacation — toggle de vacaciones de un asesor de su marca
+router.patch(
+  "/:id/vacation",
+  requireAuth,
+  requireRole("ASSISTANT_SALES", "BRAND_MANAGER"),
+  requireBrandOpForAdvisor(),
+  updateAdvisorVacationOnly
+);
 
 export default router;

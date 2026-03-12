@@ -579,13 +579,128 @@ export async function calculateRun(req, res, next) {
   }
 }
 
-// ── DELETE /api/commission-runs/:id ──────────────────────────────────────────
-export async function deleteRun(req, res, next) {
+export async function updateRunStatus(req, res, next) {
   try {
     const p = req.validated?.params || req.params;
+    const b = req.validated?.body || req.body;
     const runId = Number(p.id);
+    const status = String(b.status || "").toUpperCase();
+
+    const VALID = ["DRAFT", "CALCULATED", "ADVISOR_APPROVED", "ADVISOR_REJECTED", "ASST_VALIDATED", "SENT_TO_HR"];
+    if (!VALID.includes(status))
+      throw new HttpError(400, `Estado inválido. Valores: ${VALID.join(", ")}`);
+
+    const [rows] = await sequelize.query(
+      `SELECT id, status FROM commission_runs WHERE id = :runId LIMIT 1`,
+      { replacements: { runId } }
+    );
+    if (!rows?.[0]) throw new HttpError(404, "Corrida no encontrada");
+
+    await sequelize.query(
+      `UPDATE commission_runs SET status = :status, updated_at = NOW() WHERE id = :runId`,
+      { replacements: { status, runId } }
+    );
+    res.json({ ok: true, message: "Estado actualizado", data: { id: runId, status } });
+  } catch (err) { next(err); }
+}
+
+// ── listMyRuns — asesor ve sus propias corridas ───────────────────────────
+export async function listMyRuns(req, res, next) {
+  try {
+    const advisorId = req.user.id;
+    const { year, month } = req.query;
+
+    let where = `cr.advisor_id = :advisorId`;
+    const replacements = { advisorId };
+
+    if (year) { where += ` AND cr.cut_year  = :year`; replacements.year = Number(year); }
+    if (month) { where += ` AND cr.cut_month = :month`; replacements.month = Number(month); }
+
+    const [runs] = await sequelize.query(
+      `SELECT
+         cr.id, cr.cut_year, cr.cut_month, cr.fortnight,
+         cr.status, cr.total_commission, cr.units_total,
+         cr.rejection_note, cr.notes, cr.updated_at,
+         b.code AS brand_code, b.name AS brand_name
+       FROM commission_runs cr
+       JOIN brands b ON b.id = cr.brand_id
+       WHERE ${where}
+       ORDER BY cr.cut_year DESC, cr.cut_month DESC, cr.fortnight DESC`,
+      { replacements }
+    );
+
+    res.json({ ok: true, data: { items: runs, total: runs.length } });
+  } catch (err) { next(err); }
+}
+
+// ── advisorApproveRun — asesor aprueba su corrida ─────────────────────────
+export async function advisorApproveRun(req, res, next) {
+  try {
+    const runId = Number(req.params.id);
+    const advisorId = req.user.id;
+
+    const [rows] = await sequelize.query(
+      `SELECT id, status, advisor_id FROM commission_runs
+       WHERE id = :runId AND advisor_id = :advisorId LIMIT 1`,
+      { replacements: { runId, advisorId } }
+    );
+
+    const run = rows?.[0];
+    if (!run) throw new HttpError(404, "Corrida no encontrada");
+
+    // Solo puede aprobar si está en CALCULATED o ADVISOR_REJECTED
+    if (!["CALCULATED", "ADVISOR_REJECTED"].includes(String(run.status).toUpperCase()))
+      throw new HttpError(400, `No se puede aprobar desde estado: ${run.status}`);
+
+    await sequelize.query(
+      `UPDATE commission_runs
+       SET status = 'ADVISOR_APPROVED', rejection_note = NULL, updated_at = NOW()
+       WHERE id = :runId`,
+      { replacements: { runId } }
+    );
+
+    res.json({ ok: true, message: "Comisión aprobada", data: { id: runId, status: "ADVISOR_APPROVED" } });
+  } catch (err) { next(err); }
+}
+
+// ── advisorRejectRun — asesor rechaza su corrida ──────────────────────────
+export async function advisorRejectRun(req, res, next) {
+  try {
+    const runId = Number(req.params.id);
+    const advisorId = req.user.id;
+    const rejectionNote = String(req.body?.note || req.body?.rejection_note || "").trim();
+
+    if (!rejectionNote)
+      throw new HttpError(400, "Debes indicar el motivo del rechazo (campo: note)");
+
+    const [rows] = await sequelize.query(
+      `SELECT id, status, advisor_id FROM commission_runs
+       WHERE id = :runId AND advisor_id = :advisorId LIMIT 1`,
+      { replacements: { runId, advisorId } }
+    );
+
+    const run = rows?.[0];
+    if (!run) throw new HttpError(404, "Corrida no encontrada");
+
+    if (String(run.status).toUpperCase() !== "CALCULATED")
+      throw new HttpError(400, `Solo puedes rechazar una corrida en estado CALCULATED. Estado actual: ${run.status}`);
+
+    await sequelize.query(
+      `UPDATE commission_runs
+       SET status = 'ADVISOR_REJECTED', rejection_note = :note, updated_at = NOW()
+       WHERE id = :runId`,
+      { replacements: { runId, note: rejectionNote } }
+    );
+
+    res.json({ ok: true, message: "Comisión rechazada", data: { id: runId, status: "ADVISOR_REJECTED" } });
+  } catch (err) { next(err); }
+}
+
+// ── asstValidateRun — BrandOp valida tras aprobación del asesor ──────────
+export async function asstValidateRun(req, res, next) {
+  try {
+    const runId = Number(req.params.id);
     const brandCode = (req.brand?.code || req.query.brand || "").toUpperCase();
-    if (!brandCode) throw new HttpError(400, "Marca requerida");
 
     const [rows] = await sequelize.query(
       `SELECT cr.id, cr.status FROM commission_runs cr
@@ -596,8 +711,82 @@ export async function deleteRun(req, res, next) {
 
     const run = rows?.[0];
     if (!run) throw new HttpError(404, "Corrida no encontrada");
-    if (["APPROVED", "PAID"].includes(String(run.status).toUpperCase()))
-      throw new HttpError(409, `No se puede eliminar una corrida en estado ${run.status}`);
+
+    if (String(run.status).toUpperCase() !== "ADVISOR_APPROVED")
+      throw new HttpError(400, `Solo puedes validar corridas en estado ADVISOR_APPROVED. Estado actual: ${run.status}`);
+
+    await sequelize.query(
+      `UPDATE commission_runs SET status = 'ASST_VALIDATED', updated_at = NOW() WHERE id = :runId`,
+      { replacements: { runId } }
+    );
+
+    res.json({ ok: true, message: "Corrida validada", data: { id: runId, status: "ASST_VALIDATED" } });
+  } catch (err) { next(err); }
+}
+
+// ── sendToHR — envía a Talento Humano y cierra el flujo ──────────────────
+// (por ahora marca como SENT_TO_HR; la integración de email va en Bloque 2)
+export async function sendToHR(req, res, next) {
+  try {
+    const runId = Number(req.params.id);
+    const brandCode = (req.brand?.code || req.query.brand || "").toUpperCase();
+
+    const [rows] = await sequelize.query(
+      `SELECT cr.id, cr.status, u.full_name AS advisor_name, u.email AS advisor_email,
+              b.name AS brand_name, cr.cut_year, cr.cut_month, cr.total_commission
+       FROM commission_runs cr
+       JOIN brands b ON b.id = cr.brand_id
+       JOIN users  u ON u.id = cr.advisor_id
+       WHERE cr.id = :runId AND b.code = :brandCode LIMIT 1`,
+      { replacements: { runId, brandCode } }
+    );
+
+    const run = rows?.[0];
+    if (!run) throw new HttpError(404, "Corrida no encontrada");
+
+    if (String(run.status).toUpperCase() !== "ASST_VALIDATED")
+      throw new HttpError(400, `Solo puedes enviar corridas en estado ASST_VALIDATED. Estado actual: ${run.status}`);
+
+    await sequelize.query(
+      `UPDATE commission_runs SET status = 'SENT_TO_HR', updated_at = NOW() WHERE id = :runId`,
+      { replacements: { runId } }
+    );
+
+    // TODO Bloque 2: aquí se dispara el envío de PDF por email a Talento Humano
+
+    res.json({
+      ok: true,
+      message: "Comisión enviada a Talento Humano",
+      data: {
+        id: runId,
+        status: "SENT_TO_HR",
+        advisor_name: run.advisor_name,
+        brand_name: run.brand_name,
+        total_commission: run.total_commission,
+      },
+    });
+  } catch (err) { next(err); }
+}
+
+// ── deleteRun — eliminar corrida (solo DRAFT o CALCULATED) ────────────────
+export async function deleteRun(req, res, next) {
+  try {
+    const runId = Number(req.params.id);
+    const brandCode = (req.brand?.code || req.query.brand || "").toUpperCase();
+
+    const [rows] = await sequelize.query(
+      `SELECT cr.id, cr.status FROM commission_runs cr
+       JOIN brands b ON b.id = cr.brand_id
+       WHERE cr.id = :runId AND b.code = :brandCode LIMIT 1`,
+      { replacements: { runId, brandCode } }
+    );
+
+    const run = rows?.[0];
+    if (!run) throw new HttpError(404, "Corrida no encontrada");
+
+    const st = String(run.status).toUpperCase();
+    if (!["DRAFT", "CALCULATED"].includes(st))
+      throw new HttpError(400, `No se puede eliminar una corrida en estado: ${run.status}`);
 
     await sequelize.query(
       `DELETE FROM commission_run_items WHERE run_id = :runId`,
@@ -612,32 +801,47 @@ export async function deleteRun(req, res, next) {
   } catch (err) { next(err); }
 }
 
-export async function updateRunStatus(req, res, next) {
+export async function getRunByIdAdvisor(req, res, next) {
   try {
-    const p = req.validated?.params || req.params;
-    const b = req.validated?.body || req.body;
-    const runId = Number(p.id);
-    const status = String(b.status || "").toUpperCase();
-    const brandCode = (req.brand?.code || req.query.brand || "").toUpperCase();
+    const runId = Number(req.params.id);
+    const advisorId = req.user.id;
 
-    if (!brandCode) throw new HttpError(400, "Marca requerida");
-    if (!["DRAFT", "CALCULATED", "APPROVED", "PAID"].includes(status))
-      throw new HttpError(400, "Estado inválido");
+    if (!runId) throw new HttpError(400, "ID de corrida inválido");
 
-    const [rows] = await sequelize.query(
-      `SELECT cr.id, cr.status FROM commission_runs cr
+    const [runs] = await sequelize.query(
+      `SELECT cr.*, cr.rejection_note,
+              b.code  AS brand_code,  b.name AS brand_name,
+              u.full_name        AS advisor_name,
+              u.email            AS advisor_email,
+              u.document_number  AS advisor_document,
+              u.phone            AS advisor_phone,
+              u.hire_date        AS advisor_hire_date
+       FROM commission_runs cr
        JOIN brands b ON b.id = cr.brand_id
-       WHERE cr.id = :runId AND b.code = :brandCode LIMIT 1`,
-      { replacements: { runId, brandCode } }
+       JOIN users  u ON u.id = cr.advisor_id
+       WHERE cr.id = :runId AND cr.advisor_id = :advisorId
+       LIMIT 1`,
+      { replacements: { runId, advisorId } }
     );
 
-    if (!rows?.[0]) throw new HttpError(404, "Corrida no encontrada");
+    const run = runs?.[0];
+    if (!run) throw new HttpError(404, "Corrida no encontrada");
 
-    await sequelize.query(
-      `UPDATE commission_runs SET status = :status, updated_at = NOW() WHERE id = :runId`,
-      { replacements: { status, runId } }
+    const [items] = await sequelize.query(
+      `SELECT cri.*,
+              s.sale_date, s.invoice, s.client_name, s.plate,
+              s.cut_month AS sale_cut_month, s.fortnight AS sale_fortnight,
+              v.code    AS vehicle_code,
+              v.model   AS vehicle_model,
+              v.version AS vehicle_version
+       FROM commission_run_items cri
+       JOIN sales    s ON s.id = cri.sale_id
+       JOIN vehicles v ON v.id = cri.vehicle_id
+       WHERE cri.run_id = :runId
+       ORDER BY cri.id ASC`,
+      { replacements: { runId } }
     );
 
-    res.json({ ok: true, message: "Estado actualizado", data: { id: runId, status } });
+    res.json({ ok: true, data: { run, items: items || [] } });
   } catch (err) { next(err); }
 }

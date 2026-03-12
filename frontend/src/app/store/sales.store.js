@@ -1,27 +1,28 @@
 import { create } from "zustand";
-import { salesApi } from "../../api/sales.api";
-import { brandsApi } from "../../api/brands.api";
+import { salesApi }    from "../../api/sales.api";
+import { brandsApi }   from "../../api/brands.api";
 import { vehiclesApi } from "../../api/vehicles.api";
-import { usersApi } from "../../api/users.api"; // Debe existir en tu proyecto (si no, te doy fallback abajo)
+import { usersApi }    from "../../api/users.api";
+import { useAuthStore } from "./auth.store";
 
 const initialFilters = {
-  page: 1,
-  limit: 10,
-  q: "",
-  brand_id: "6", // KIA por defecto
+  page:      1,
+  limit:     10,
+  q:         "",
+  brand_id:  "6", // KIA por defecto
   date_from: "",
-  date_to: "",
+  date_to:   "",
 };
 
 function normalizeListResponse(res) {
-  const root = res?.data ?? res ?? {};
+  const root    = res?.data ?? res ?? {};
   const payload = root?.data ?? root;
 
   const items =
     payload?.items ||
     payload?.sales ||
-    payload?.rows ||
-    payload?.data ||
+    payload?.rows  ||
+    payload?.data  ||
     (Array.isArray(payload) ? payload : []);
 
   const total =
@@ -36,25 +37,31 @@ function normalizeListResponse(res) {
   return { items: items || [], total: total || 0, totalPages: totalPages || 1 };
 }
 
+// Helper: devuelve el advisor_id a forzar si el usuario es ADVISOR
+function getAdvisorIdFilter() {
+  const user = useAuthStore.getState().user;
+  const role = String(user?.role || "").toUpperCase();
+  return role === "ADVISOR" ? user?.id : undefined;
+}
+
 export const useSalesStore = create((set, get) => ({
   // Data
-  items: [],
-  total: 0,
+  items:      [],
+  total:      0,
   totalPages: 1,
-
-  brands: [],
-  vehicles: [],
-  advisors: [],
+  brands:     [],
+  vehicles:   [],
+  advisors:   [],
 
   // UI/State
-  filters: { ...initialFilters },
+  filters:   { ...initialFilters },
   isLoading: false,
-  isSaving: false,
-  error: null,
+  isSaving:  false,
+  error:     null,
 
   // Dialog
   openForm: false,
-  formMode: "create", // create | edit
+  formMode: "create",
   formSale: null,
 
   // --- Filters ---
@@ -64,57 +71,51 @@ export const useSalesStore = create((set, get) => ({
         ...s.filters,
         ...patch,
         page:
-          patch.page ??
-          (patch.q !== undefined ||
-            patch.brand_id !== undefined ||
-            patch.date_from !== undefined ||
-            patch.date_to !== undefined
-            ? 1
-            : s.filters.page),
+          patch.page ?? (
+            patch.q          !== undefined ||
+            patch.brand_id   !== undefined ||
+            patch.date_from  !== undefined ||
+            patch.date_to    !== undefined
+              ? 1
+              : s.filters.page
+          ),
       },
     })),
 
   resetFilters: () => set({ filters: { ...initialFilters } }),
 
-  // --- Meta (brands, vehicles, advisors) ---
+  // --- Meta ---
   hydrateMeta: async () => {
-    // Brands
     try {
-      const res = await brandsApi.list();
-      const root = res?.data ?? res;
+      const res    = await brandsApi.list();
+      const root   = res?.data ?? res;
       const brands = root?.brands ?? root?.data ?? root ?? [];
       set({ brands: Array.isArray(brands) ? brands : [] });
     } catch {
       set({ brands: [] });
     }
 
-    // Vehicles (por marca actual)
     await get().fetchVehiclesForBrand();
 
-    // Advisors (usuarios con rol ASESOR)
-    await get().fetchAdvisors();
+    // Advisors: solo cargar si NO es ADVISOR (ellos no necesitan la lista)
+    const advisorId = getAdvisorIdFilter();
+    if (!advisorId) await get().fetchAdvisors();
   },
 
   fetchVehiclesForBrand: async () => {
     const { filters } = get();
     try {
-      const res = await vehiclesApi.list({
+      const res     = await vehiclesApi.list({
         brand_id: filters.brand_id ? Number(filters.brand_id) : undefined,
         status: "active",
         limit: 200,
         page: 1,
       });
-
-      // vehiclesApi.list te puede devolver {items} o {vehicles} etc
-      const root = res?.data ?? res;
+      const root    = res?.data ?? res;
       const payload = root?.data ?? root;
-      const items =
-        payload?.items ||
-        payload?.vehicles ||
-        payload?.rows ||
-        payload?.data ||
-        (Array.isArray(payload) ? payload : []);
-
+      const items   =
+        payload?.items || payload?.vehicles || payload?.rows ||
+        payload?.data  || (Array.isArray(payload) ? payload : []);
       set({ vehicles: items || [] });
     } catch {
       set({ vehicles: [] });
@@ -123,40 +124,34 @@ export const useSalesStore = create((set, get) => ({
 
   fetchAdvisors: async () => {
     try {
-      const res = await usersApi.list({
-        role: "ADVISOR",
-        limit: 100,
-        page: 1,
-      });
-
-      // 🔥 extracción correcta según tu backend
+      const res   = await usersApi.list({ role: "ADVISOR", limit: 100, page: 1 });
       const items = res?.data?.items ?? [];
-
       set({ advisors: items });
-    } catch (error) {
-      console.error("Error loading advisors", error);
+    } catch {
       set({ advisors: [] });
     }
   },
-
 
   // --- List ---
   fetchSales: async () => {
     const { filters } = get();
     set({ isLoading: true, error: null });
 
+    // Si el usuario es ADVISOR, siempre filtra por su propio ID
+    const advisorId = getAdvisorIdFilter();
+
     try {
       const res = await salesApi.list({
-        page: filters.page,
-        limit: filters.limit,
-        q: filters.q || undefined,
-        brand_id: filters.brand_id ? Number(filters.brand_id) : undefined,
-        date_from: filters.date_from || undefined,
-        date_to: filters.date_to || undefined,
+        page:       filters.page,
+        limit:      filters.limit,
+        q:          filters.q || undefined,
+        brand_id:   filters.brand_id ? Number(filters.brand_id) : undefined,
+        date_from:  filters.date_from || undefined,
+        date_to:    filters.date_to || undefined,
+        advisor_id: advisorId || undefined, // ← forzado para ADVISOR
       });
 
       const { items, total, totalPages } = normalizeListResponse(res);
-
       set({ items, total, totalPages, isLoading: false });
     } catch (e) {
       const msg = e?.response?.data?.message || "No se pudieron cargar las ventas";
@@ -166,25 +161,25 @@ export const useSalesStore = create((set, get) => ({
 
   // --- Form ---
   openCreate: async () => {
-    const brand_id = Number(get().filters.brand_id || 6);
+    const advisorId = getAdvisorIdFilter();
+    const brand_id  = Number(get().filters.brand_id || 6);
 
-    // refrescar vehículos por marca
     await get().fetchVehiclesForBrand();
 
     set({
-      openForm: true,
-      formMode: "create",
-      error: null,
-      // dentro de openCreate
+      openForm:  true,
+      formMode:  "create",
+      error:     null,
       formSale: {
         brand_id,
-        advisor_id: "",
+        // Si es ADVISOR, preseleccionar y bloquear su propio ID
+        advisor_id: advisorId ? String(advisorId) : "",
         vehicle_id: "",
-        sale_date: new Date().toISOString().slice(0, 10),
-        invoice: "",
+        sale_date:  new Date().toISOString().slice(0, 10),
+        invoice:    "",
         client_name: "",
-        plate: "",
-        notes: "",
+        plate:      "",
+        notes:      "",
       },
     });
   },
@@ -192,31 +187,30 @@ export const useSalesStore = create((set, get) => ({
   openEdit: async (sale) => {
     set({ openForm: true, formMode: "edit", formSale: null, isSaving: false, error: null });
     try {
-      const res = await salesApi.getById(sale.id);
+      const res  = await salesApi.getById(sale.id);
       const root = res?.data ?? res;
-      const s = root?.sale ?? root?.data ?? root;
+      const s    = root?.sale ?? root?.data ?? root;
 
       set({
         formSale: {
-          id: s.id,
-          brand_id: Number(s.brand_id),
-          advisor_id: s.advisor_id ?? "",
-          vehicle_id: s.vehicle_id ?? "",
-          sale_date: s.sale_date,
-          cut_month: s.cut_month,
-          fortnight: s.fortnight,
+          id:           s.id,
+          brand_id:     Number(s.brand_id),
+          advisor_id:   s.advisor_id ?? "",
+          vehicle_id:   s.vehicle_id ?? "",
+          sale_date:    s.sale_date,
+          cut_month:    s.cut_month,
+          fortnight:    s.fortnight,
           charge_month: s.charge_month ?? null,
-          invoice: s.invoice ?? "",
-          client_name: s.client_name ?? "",
-          plate: s.plate ?? "",
-          notes: s.notes ?? "",
+          invoice:      s.invoice ?? "",
+          client_name:  s.client_name ?? "",
+          plate:        s.plate ?? "",
+          notes:        s.notes ?? "",
         },
       });
 
-      // cargar vehículos para la marca del registro
       set({ filters: { ...get().filters, brand_id: String(s.brand_id) } });
       await get().fetchVehiclesForBrand();
-    } catch (e) {
+    } catch {
       set({ openForm: false, formSale: null });
     }
   },
@@ -235,25 +229,21 @@ export const useSalesStore = create((set, get) => ({
     set({ isSaving: true, error: null });
 
     try {
-      // ✅ payload limpio (sin comisión/tabla)
-      // dentro de submitForm
       const payload = {
-        brand_id: Number(formSale.brand_id),
-        advisor_id: Number(formSale.advisor_id),
-        vehicle_id: Number(formSale.vehicle_id),
-        sale_date: formSale.sale_date,
-        invoice: formSale.invoice?.trim() || null,
+        brand_id:    Number(formSale.brand_id),
+        advisor_id:  Number(formSale.advisor_id),
+        vehicle_id:  Number(formSale.vehicle_id),
+        sale_date:   formSale.sale_date,
+        invoice:     formSale.invoice?.trim() || null,
         client_name: String(formSale.client_name || "").trim(),
-        plate: formSale.plate?.trim() || null,
-        notes: formSale.notes?.trim() || null,
+        plate:       formSale.plate?.trim() || null,
+        notes:       formSale.notes?.trim() || null,
       };
 
-      // validaciones mínimas
-      if (!payload.brand_id || !payload.advisor_id || !payload.vehicle_id) {
+      if (!payload.brand_id || !payload.advisor_id || !payload.vehicle_id)
         throw new Error("Completa Marca, Asesor y Vehículo");
-      }
-      if (!payload.sale_date) throw new Error("Selecciona la fecha de la venta");
-      if (!payload.client_name) throw new Error("El nombre del cliente es obligatorio");
+      if (!payload.sale_date)    throw new Error("Selecciona la fecha de la venta");
+      if (!payload.client_name)  throw new Error("El nombre del cliente es obligatorio");
 
       if (formMode === "create") {
         await salesApi.create(payload);
