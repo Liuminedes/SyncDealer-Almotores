@@ -28,19 +28,29 @@ export async function listExportable(req, res, next) {
     const role      = String(req.user?.role || "").toUpperCase();
     const isBrandOp = ["ASSISTANT_SALES","BRAND_MANAGER"].includes(role);
 
-    let brandFilter = "";
+    // Para BrandOp: obtener su brand_id autorizado (paramétrico, nunca concatenado)
+    let authorizedBrandId = 0; // 0 = sin filtro (ADMIN ve todo)
     if (isBrandOp) {
       const [br] = await sequelize.query(
         `SELECT brand_id FROM user_brand_access WHERE user_id = :uid ORDER BY brand_id ASC LIMIT 1`,
         { replacements: { uid: req.user.id } }
       );
-      const bid = br?.[0]?.brand_id;
-      if (bid) brandFilter = `AND cr.brand_id = ${bid}`;
+      authorizedBrandId = Number(br?.[0]?.brand_id ?? 0);
+      if (!authorizedBrandId) {
+        // BrandOp sin marca asignada → no ve nada
+        return res.json({ ok: true, data: { items: [], total: 0 } });
+      }
     }
 
     const year  = Number(req.query.year  || new Date().getFullYear());
     const month = Number(req.query.month || new Date().getMonth() + 1);
 
+    // Validar rango de período
+    if (month < 1 || month > 12 || year < 2000 || year > 2100) {
+      throw new HttpError(400, "Período inválido");
+    }
+
+    // SEGURO: brand_id siempre va como replacement, nunca concatenado
     const [rows] = await sequelize.query(`
       SELECT cr.id, cr.cut_year, cr.cut_month, cr.fortnight,
              cr.status, cr.total_commission, cr.units_total,
@@ -51,13 +61,14 @@ export async function listExportable(req, res, next) {
       JOIN brands b ON b.id = cr.brand_id
       WHERE cr.cut_year = :year AND cr.cut_month = :month
         AND cr.status = 'ASST_VALIDATED'
-        ${brandFilter}
+        AND (:authorizedBrandId = 0 OR cr.brand_id = :authorizedBrandId)
       ORDER BY b.code ASC, u.full_name ASC
-    `, { replacements: { year, month } });
+    `, { replacements: { year, month, authorizedBrandId } });
 
     res.json({ ok: true, data: { items: rows, total: rows.length } });
   } catch (err) { next(err); }
 }
+
 
 // ── Construir PDFs + ZIP en memoria ─────────────────────────────────────────
 async function buildZip(runIds) {
@@ -119,6 +130,40 @@ async function buildZip(runIds) {
   });
 }
 
+// ── Helper: sanitizar y verificar autorización de run_ids ────────────────────
+async function authorizeRunIds(runIds, user) {
+  // Sanitizar — solo enteros positivos
+  const sanitized = runIds.map(Number).filter(n => Number.isInteger(n) && n > 0);
+  if (sanitized.length !== runIds.length)
+    throw new HttpError(400, "run_ids contiene valores inválidos");
+
+  const role      = String(user?.role || "").toUpperCase();
+  const isBrandOp = ["ASSISTANT_SALES", "BRAND_MANAGER"].includes(role);
+  const replacements = { ids: sanitized };
+  let brandFilter = "";
+
+  if (isBrandOp) {
+    const [br] = await sequelize.query(
+      `SELECT brand_id FROM user_brand_access WHERE user_id = :uid LIMIT 1`,
+      { replacements: { uid: user.id } }
+    );
+    const authorizedBrandId = Number(br?.[0]?.brand_id ?? 0);
+    if (!authorizedBrandId) throw new HttpError(403, "Sin marca asignada");
+    brandFilter = "AND cr.brand_id = :authorizedBrandId";
+    replacements.authorizedBrandId = authorizedBrandId;
+  }
+
+  // Verificar que TODOS los IDs pertenecen a la marca autorizada
+  const [verified] = await sequelize.query(
+    `SELECT id FROM commission_runs cr WHERE cr.id IN (:ids) ${brandFilter}`,
+    { replacements }
+  );
+  if (verified.length !== sanitized.length)
+    throw new HttpError(403, "Uno o más IDs no pertenecen a tu marca autorizada");
+
+  return sanitized;
+}
+
 // ── Descargar ZIP ─────────────────────────────────────────────────────────────
 export async function downloadZip(req, res, next) {
   try {
@@ -126,7 +171,8 @@ export async function downloadZip(req, res, next) {
     if (!Array.isArray(run_ids) || run_ids.length === 0)
       throw new HttpError(400, "Debes seleccionar al menos una corrida");
 
-    const { zip, pdfs } = await buildZip(run_ids);
+    const sanitizedIds = await authorizeRunIds(run_ids, req.user);
+    const { zip } = await buildZip(sanitizedIds);
     const filename = `comisiones_${year || ""}${month ? "_" + String(month).padStart(2,"0") : ""}.zip`;
 
     res.setHeader("Content-Type",        "application/zip");
@@ -143,27 +189,30 @@ export async function sendToHRBulk(req, res, next) {
     if (!Array.isArray(run_ids) || run_ids.length === 0)
       throw new HttpError(400, "Debes seleccionar al menos una corrida");
 
-    const { zip } = await buildZip(run_ids);
+    // SEGURO: valida que los IDs pertenecen a la marca del usuario autenticado
+    const sanitizedIds = await authorizeRunIds(run_ids, req.user);
+
+    const { zip } = await buildZip(sanitizedIds);
 
     // Enviar email
     await sendCommissionsToHR(zip, {
       month:  Number(month),
       year:   Number(year),
       brand:  brand || null,
-      count:  run_ids.length,
+      count:  sanitizedIds.length,
     });
 
-    // Marcar todas como SENT_TO_HR
+    // Marcar como SENT_TO_HR — usando IN(:ids) con replacements seguros
     await sequelize.query(
       `UPDATE commission_runs SET status = 'SENT_TO_HR', updated_at = NOW()
-       WHERE id IN (${run_ids.map(() => "?").join(",")})`,
-      { replacements: run_ids, type: sequelize.QueryTypes.UPDATE }
+       WHERE id IN (:ids)`,
+      { replacements: { ids: sanitizedIds }, type: sequelize.QueryTypes.UPDATE }
     );
 
     res.json({
       ok: true,
-      message: `${run_ids.length} comisión(es) enviadas a Talento Humano`,
-      data: { sent: run_ids.length },
+      message: `${sanitizedIds.length} comisión(es) enviadas a Talento Humano`,
+      data: { sent: sanitizedIds.length },
     });
   } catch (err) { next(err); }
 }

@@ -1,7 +1,9 @@
-// backend/src/services/users/users.import.service.js  v2
+// backend/src/services/users/users.import.service.js  v3
 // FIX: marca no se asignaba por insertId null + mejor detección de columna marca
+// SECURITY: contraseña inicial ahora es aleatoria (crypto.randomBytes), no la cédula
 import XLSX      from "xlsx";
 import bcrypt    from "bcryptjs";
+import crypto    from "crypto";
 import { sequelize } from "../../config/db.js";
 import { HttpError }  from "../../utils/httpError.js";
 
@@ -186,8 +188,10 @@ export async function importUsersFromExcel(fileBuffer) {
 
         } else {
           // ── CREATE ────────────────────────────────────────────────────────
-          const rawPassword   = cedula || email;
-          const password_hash = await bcrypt.hash(rawPassword, 10);
+          // SEGURO: contraseña temporal aleatoria, nunca la cédula (dato público)
+          // El admin deberá comunicar la contraseña al asesor por canal seguro
+          const rawPassword   = crypto.randomBytes(12).toString("base64url");
+          const password_hash = await bcrypt.hash(rawPassword, 12); // cost 12 para prod
 
           await sequelize.query(
             `INSERT INTO users

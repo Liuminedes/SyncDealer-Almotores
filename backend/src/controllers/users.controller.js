@@ -1,5 +1,8 @@
 // src/controllers/users.controller.js
 import * as usersService from "../services/users/users.service.js";
+import { sequelize }     from "../config/db.js";
+import { HttpError }     from "../utils/httpError.js";
+
 
 export async function listUsers(req, res, next) {
   try {

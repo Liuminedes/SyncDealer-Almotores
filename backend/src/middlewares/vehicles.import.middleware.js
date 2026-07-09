@@ -3,17 +3,20 @@
 import multer from "multer";
 import { HttpError } from "../utils/httpError.js";
 
+// MIMES estrictos — application/octet-stream eliminado (acepta cualquier binario)
 const ALLOWED_MIMES = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
   "application/vnd.ms-excel",                                           // .xls
-  "application/octet-stream",                                           // algunos navegadores
 ];
 
 const storage = multer.memoryStorage(); // buffer en RAM, no toca el disco
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB máx
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5 MB máx (suficiente para cualquier Excel de nómina)
+    files: 1,                   // Un solo archivo por request
+  },
   fileFilter: (_req, file, cb) => {
     const ext  = (file.originalname || "").toLowerCase();
     const mime = file.mimetype || "";
@@ -21,8 +24,11 @@ const upload = multer({
     const validExt  = ext.endsWith(".xlsx") || ext.endsWith(".xls");
     const validMime = ALLOWED_MIMES.includes(mime);
 
-    if (validExt || validMime) return cb(null, true);
-    cb(new HttpError(400, "Solo se aceptan archivos Excel (.xlsx o .xls)"));
+    // SEGURO: ambas condiciones deben cumplirse (AND, no OR)
+    // Evita que un archivo malicioso con MIME genérico pase el filtro
+    if (validExt && validMime) return cb(null, true);
+
+    cb(new HttpError(400, "Solo se aceptan archivos Excel válidos (.xlsx o .xls)"));
   },
 });
 

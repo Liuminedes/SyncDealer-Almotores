@@ -1,0 +1,127 @@
+##############################################################################
+#  SyncDealer Almotores — docker-compose.yml
+#
+#  Servicios:
+#    - db        : MySQL 8.0 (datos persistentes en volumen)
+#    - backend   : API Express/Node.js
+#    - frontend  : React SPA servida por Nginx
+#
+#  USO EN DOKPLOY:
+#    Subir este repo a Git. En Dokploy crear un "Compose" apuntando al repo.
+#    Las variables de entorno se configuran en la UI de Dokploy (no en este archivo).
+#
+#  USO LOCAL (desarrollo):
+#    cp backend/.env.example backend/.env   # completar valores reales
+#    docker compose up --build
+##############################################################################
+
+services:
+
+  # ── Base de datos MySQL ────────────────────────────────────────────────────
+  db:
+    image: mysql:8.0
+    container_name: syncdealer_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE:      ${DB_NAME}
+      MYSQL_USER:          ${DB_USER}
+      MYSQL_PASSWORD:      ${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - syncdealer_net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    # Ajustes de rendimiento recomendados para MySQL 8 en VPS pequeño
+    command: >
+      --innodb-buffer-pool-size=256M
+      --max-connections=100
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+
+  # ── Backend API ────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: syncdealer_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV:      ${NODE_ENV:-production}
+      PORT:          ${PORT:-5001}
+
+      # Base de datos — apunta al servicio "db" dentro de la red interna
+      DB_HOST:       db
+      DB_PORT:       3306
+      DB_NAME:       ${DB_NAME}
+      DB_USER:       ${DB_USER}
+      DB_PASSWORD:   ${DB_PASSWORD}
+
+      # JWT
+      JWT_SECRET:     ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+
+      # CORS — URL del frontend en producción
+      CORS_ORIGIN:    ${CORS_ORIGIN}
+
+      # SMTP
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      HR_EMAIL:  ${HR_EMAIL}
+
+    networks:
+      - syncdealer_net
+    # El backend NO expone puerto al exterior directamente.
+    # Dokploy/Nginx hace el proxy. En local lo exponemos para facilitar dev.
+    ports:
+      - "${BACKEND_PORT:-5001}:5001"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ── Frontend SPA ───────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # VITE_API_URL se empaqueta en tiempo de build.
+        # En Dokploy configurar como Build Argument, NO como env runtime.
+        VITE_API_URL: ${VITE_API_URL}
+    container_name: syncdealer_web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - syncdealer_net
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+# ── Volúmenes persistentes ────────────────────────────────────────────────────
+volumes:
+  db_data:
+    driver: local
+
+# ── Red interna ───────────────────────────────────────────────────────────────
+networks:
+  syncdealer_net:
+    driver: bridge

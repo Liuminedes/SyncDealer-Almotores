@@ -17,7 +17,12 @@ function getTransporter() {
       user: ENV.SMTP_USER,
       pass: ENV.SMTP_PASS,
     },
-    tls: { rejectUnauthorized: false }, // útil en servidores internos sin cert válido
+    // SEGURO: validación TLS habilitada en producción.
+    // Si el servidor SMTP usa cert autofirmado, la solución correcta es
+    // proveer el CA en tls.ca — nunca deshabilitar rejectUnauthorized en prod.
+    tls: {
+      rejectUnauthorized: ENV.NODE_ENV === "production",
+    },
   });
   return _transporter;
 }

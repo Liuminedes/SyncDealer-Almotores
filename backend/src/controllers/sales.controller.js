@@ -1,63 +1,78 @@
 // backend/src/controllers/sales.controller.js
-// CAMBIOS: +removeBulk (DELETE /bulk)
-import { Op, literal } from "sequelize";
+// CAMBIOS: +removeBulk (DELETE /bulk) | SEGURIDAD: fecha sanitizada via Op.between
+import { Op } from "sequelize";
 import Sale    from "../models/Sale.js";
 import User    from "../models/User.js";
 import Vehicle from "../models/Vehicle.js";
 
-export const list = async (req, res) => {
-  const {
-    page = 1, limit = 10,
-    q, brand_id, advisor_id,
-    cut_month, cut_year,
-    date_from, date_to,
-  } = req.query;
+// Validador de fecha ISO YYYY-MM-DD
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-  const conditions = [];
-  if (brand_id) conditions.push({ brand_id: Number(brand_id) });
+export const list = async (req, res, next) => {
+  try {
+    const {
+      page = 1, limit = 10,
+      q, brand_id, advisor_id,
+      cut_month, cut_year,
+      date_from, date_to,
+    } = req.query;
 
-  const role = String(req.user?.role || "").toUpperCase();
-  if (role === "ADVISOR") {
-    conditions.push({ advisor_id: req.user.id });
-  } else if (advisor_id === "none") {
-    // Ventas sin asesor asignado
-    conditions.push({ advisor_id: null });
-  } else if (advisor_id) {
-    conditions.push({ advisor_id: Number(advisor_id) });
-  }
+    const conditions = [];
+    if (brand_id) conditions.push({ brand_id: Number(brand_id) });
 
-  if (cut_year && cut_month) {
-    const y = String(cut_year);
-    const m = String(cut_month).padStart(2, "0");
-    const lastDay = new Date(Number(y), Number(m), 0).getDate();
-    conditions.push(literal(`sale_date BETWEEN '${y}-${m}-01' AND '${y}-${m}-${lastDay}'`));
-  } else if (date_from && date_to) {
-    conditions.push(literal(`sale_date BETWEEN '${date_from}' AND '${date_to}'`));
-  }
+    const role = String(req.user?.role || "").toUpperCase();
+    if (role === "ADVISOR") {
+      conditions.push({ advisor_id: req.user.id });
+    } else if (advisor_id === "none") {
+      conditions.push({ advisor_id: null });
+    } else if (advisor_id) {
+      conditions.push({ advisor_id: Number(advisor_id) });
+    }
 
-  if (q) {
-    conditions.push({
-      [Op.or]: [
-        { invoice:     { [Op.like]: `%${q}%` } },
-        { client_name: { [Op.like]: `%${q}%` } },
-        { plate:       { [Op.like]: `%${q}%` } },
+    if (cut_year && cut_month) {
+      const y = Number(cut_year);
+      const m = Number(cut_month);
+      // Validar rango numérico — sin pasar a literal()
+      if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12 || y < 2000 || y > 2100) {
+        return res.status(400).json({ message: "Período inválido" });
+      }
+      const lastDay = new Date(y, m, 0).getDate();
+      const start = `${y}-${String(m).padStart(2, "0")}-01`;
+      const end   = `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2,"0")}`;
+      // Op.between — puro ORM, sin SQL concatenado
+      conditions.push({ sale_date: { [Op.between]: [start, end] } });
+    } else if (date_from || date_to) {
+      // Validar formato ISO estricto antes de usarlos
+      if (!ISO_DATE_RE.test(date_from) || !ISO_DATE_RE.test(date_to)) {
+        return res.status(400).json({ message: "Formato de fecha inválido. Use YYYY-MM-DD" });
+      }
+      conditions.push({ sale_date: { [Op.between]: [date_from, date_to] } });
+    }
+
+    if (q) {
+      conditions.push({
+        [Op.or]: [
+          { invoice:     { [Op.like]: `%${q}%` } },
+          { client_name: { [Op.like]: `%${q}%` } },
+          { plate:       { [Op.like]: `%${q}%` } },
+        ],
+      });
+    }
+
+    const where  = conditions.length ? { [Op.and]: conditions } : {};
+    const offset = (Number(page) - 1) * Number(limit);
+
+    const { rows, count } = await Sale.findAndCountAll({
+      where, limit: Number(limit), offset,
+      order: [["sale_date", "DESC"]],
+      include: [
+        { model: User,    as: "advisor", attributes: ["id", "full_name", "email"] },
+        { model: Vehicle, as: "vehicle", attributes: ["id", "code", "model", "version"] },
       ],
     });
-  }
 
-  const where  = conditions.length ? { [Op.and]: conditions } : {};
-  const offset = (Number(page) - 1) * Number(limit);
-
-  const { rows, count } = await Sale.findAndCountAll({
-    where, limit: Number(limit), offset,
-    order: [["sale_date", "DESC"]],
-    include: [
-      { model: User,    as: "advisor", attributes: ["id", "full_name", "email"] },
-      { model: Vehicle, as: "vehicle", attributes: ["id", "code", "model", "version"] },
-    ],
-  });
-
-  res.json({ data: { items: rows, total: count, page: Number(page), limit: Number(limit) } });
+    res.json({ data: { items: rows, total: count, page: Number(page), limit: Number(limit) } });
+  } catch (err) { next(err); }
 };
 
 export const getById = async (req, res) => {

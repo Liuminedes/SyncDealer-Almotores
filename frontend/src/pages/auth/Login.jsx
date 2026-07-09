@@ -53,10 +53,10 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [email, setEmail] = useState("auxinformatica2@almotores.com");
-  const [password, setPassword] = useState("Admin123*");
-  const [remember, setRemember] = useState(true);
-  const [error, setError] = useState("");
+  const [email,    setEmail]    = useState("");
+  const [password,  setPassword]  = useState("");
+  const [remember,  setRemember]  = useState(false);
+  const [error,     setError]     = useState("");
 
   const from = useMemo(
     () => location.state?.from || "/dashboard",
