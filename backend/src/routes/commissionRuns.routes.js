@@ -25,18 +25,20 @@ import {
   asstValidateRun,
   sendToHR,
   listMyRuns,
+  applyAdjustment,
+  removeAdjustment,
 } from "../controllers/commissionRuns.controller.js";
 
 const router = Router();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RUTAS ASESOR — sin ?brand=, van PRIMERO para evitar conflicto con /:id
+// RUTAS ASESOR — van PRIMERO para evitar conflicto con /:id
 // ─────────────────────────────────────────────────────────────────────────────
 
 // GET  /api/commission-runs/my
 router.get("/my",     requireAuth, requireOwnAdvisor(), listMyRuns);
 
-// GET  /api/commission-runs/my/:id  ← fix "Marca requerida"
+// GET  /api/commission-runs/my/:id
 router.get("/my/:id", requireAuth, requireOwnAdvisor(), getRunByIdAdvisor);
 
 // POST /api/commission-runs/:id/advisor-approve
@@ -46,7 +48,7 @@ router.post("/:id/advisor-approve", requireAuth, requireOwnAdvisor(), advisorApp
 router.post("/:id/advisor-reject",  requireAuth, requireOwnAdvisor(), advisorRejectRun);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RUTAS ADMIN / BRAND_OP — requieren ?brand=
+// RUTAS ADMIN / BRAND_OP — requieren ?brand=CODE
 // ─────────────────────────────────────────────────────────────────────────────
 
 // GET  /api/commission-runs?brand=KIA
@@ -74,6 +76,24 @@ router.post(
   requireBrandPermission("generate", (req) => req.query.brand),
   validate(calculateRunSchema),
   calculateRun
+);
+
+// PATCH /api/commission-runs/:id/adjustment?brand=KIA
+// Aplica o modifica ajuste manual (ADD o SUBTRACT) en estado CALCULATED
+router.patch(
+  "/:id/adjustment",
+  requireAuth,
+  requireBrandPermission("generate", (req) => req.query.brand),
+  applyAdjustment
+);
+
+// DELETE /api/commission-runs/:id/adjustment?brand=KIA
+// Elimina el ajuste manual y restaura total = base_commission
+router.delete(
+  "/:id/adjustment",
+  requireAuth,
+  requireBrandPermission("generate", (req) => req.query.brand),
+  removeAdjustment
 );
 
 // PATCH /api/commission-runs/:id/status?brand=KIA

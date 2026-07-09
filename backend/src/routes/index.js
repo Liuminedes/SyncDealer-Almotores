@@ -15,6 +15,7 @@ import percentageTiersRoutes    from "./percentageTiers.routes.js";
 import schemeRulesBonusesRoutes from "./scheme-rules-bonuses.routes.js";
 import advisorVacationsRoutes   from "./advisorVacations.routes.js";
 import dashboardRoutes          from "./dashboard.routes.js";
+import exportsRoutes            from "./exports.routes.js";
 
 const router = Router();
 
@@ -29,6 +30,7 @@ router.use("/commission-schemes", commissionSchemesRoutes);
 router.use("/vehicles",           vehiclesRoutes);
 router.use("/sales",              salesRoutes);
 router.use("/dashboard",          dashboardRoutes);
+router.use("/exports",            exportsRoutes);
 
 router.use(brandConfigRoutes);
 router.use(schemeTiersRoutes);

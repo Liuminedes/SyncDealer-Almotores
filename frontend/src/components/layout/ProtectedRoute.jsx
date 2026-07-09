@@ -5,7 +5,9 @@ import { usePermissions, ROLES } from "../../app/hooks/usePermissions";
 
 // ── Mapa: ruta → qué permiso la protege ──────────────────────────────────
 function canAccessRoute(pathname, perms) {
-  if (pathname.startsWith("/brands"))              return perms.is.admin;
+  if (pathname.startsWith("/branches"))            return perms.is.admin;
+  if (pathname === "/brands")                      return perms.is.admin;          // lista solo admin
+  if (pathname.startsWith("/brands/"))             return perms.is.admin || perms.is.brandOp; // detalle también brandOp
   if (pathname.startsWith("/users"))               return perms.is.admin || perms.is.brandOp;
   if (pathname.startsWith("/vehicles"))            return perms.vehicles.view;
   if (pathname.startsWith("/commissions"))         return perms.runs.viewBrand;

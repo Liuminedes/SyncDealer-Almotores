@@ -13,6 +13,7 @@ import DescriptionRoundedIcon   from "@mui/icons-material/DescriptionRounded";
 import FileDownloadRoundedIcon  from "@mui/icons-material/FileDownloadRounded";
 import DirectionsCarRoundedIcon from "@mui/icons-material/DirectionsCarRounded";
 import StorefrontRoundedIcon    from "@mui/icons-material/StorefrontRounded";
+import LocationOnRoundedIcon     from "@mui/icons-material/LocationOnRounded";
 import ReceiptLongRoundedIcon   from "@mui/icons-material/ReceiptLongRounded";
 import BadgeRoundedIcon         from "@mui/icons-material/BadgeRounded";
 
@@ -65,14 +66,19 @@ function buildNavSections(perms) {
           label: "Usuarios",
           to: "/users",
           icon: <PeopleAltRoundedIcon />,
-          // Admin ve la lista completa; BrandOp ve solo sus asesores
           show: () => true,
         },
         {
           label: "Marcas",
           to: "/brands",
           icon: <StorefrontRoundedIcon />,
-          show: () => perms.is.admin, // solo Admin
+          show: () => perms.is.admin,
+        },
+        {
+          label: "Sedes",
+          to: "/branches",
+          icon: <LocationOnRoundedIcon />,
+          show: () => perms.is.admin,
         },
       ],
     },

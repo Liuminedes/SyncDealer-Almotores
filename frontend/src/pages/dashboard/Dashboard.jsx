@@ -750,35 +750,54 @@ function AdvisorDashboard() {
   const { user } = useAuthStore();
   const [selYear,  setSelYear]  = useState(now.getFullYear());
   const [selMonth, setSelMonth] = useState(now.getMonth() + 1);
-  const [stats,   setStats]   = useState(null);
-  const [runs,    setRuns]    = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(null);
+  const [stats,    setStats]    = useState(null);
+  const [runs,     setRuns]     = useState([]);
+  const [bonuses,  setBonuses]  = useState([]); // bonos activos de la marca
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState(null);
 
   const years = [now.getFullYear() - 1, now.getFullYear()];
+
+  // Mes anterior al seleccionado para la gráfica comparativa
+  const prevM = useMemo(() => prevMonth(selYear, selMonth), [selYear, selMonth]);
 
   const load = useCallback(async (y, m) => {
     setLoading(true); setError(null);
     try {
-      // Ventas del mes seleccionado — el backend fuerza advisor_id por rol JWT
-      const salesRes = await salesApi.list({
-        cut_year:  y,
-        cut_month: m,
-        limit: 200, page: 1,
-      });
-      // salesApi.list retorna response.data (axios unwrap); backend devuelve { data: { items, total } }
+      // ── Ventas mes seleccionado ──────────────────────────────────────────
+      const salesRes = await salesApi.list({ cut_year: y, cut_month: m, limit: 200, page: 1 });
       const salesData  = salesRes?.data ?? salesRes;
       const totalSales = Number(salesData?.total ?? (salesData?.items ?? []).length ?? 0);
+      const salesItems = salesData?.items ?? [];
 
-      // Comisiones del mes seleccionado
+      // ── Ventas mes anterior (para gráfica comparativa) ───────────────────
+      const prevRes   = await salesApi.list({ cut_year: prevMonth(y, m).year, cut_month: prevMonth(y, m).month, limit: 200, page: 1 });
+      const prevData  = prevRes?.data ?? prevRes;
+      const prevSales = Number(prevData?.total ?? (prevData?.items ?? []).length ?? 0);
+
+      // ── Comisiones del mes seleccionado ──────────────────────────────────
       let runsData = [];
       try {
         const runsRes = await http.get("/commission-runs/my", { params: { year: y, month: m } });
         runsData = runsRes?.data?.data?.items ?? runsRes?.data?.items ?? [];
       } catch { /* silencioso */ }
 
-      setStats({ totalSales });
+      // ── Bonos activos de la marca del asesor ─────────────────────────────
+      let bonusesData = [];
+      try {
+        const brandId = user?.brands?.[0]?.brand_id;
+        if (brandId) {
+          const { scheme } = await http.get(`/brands/${brandId}/scheme`).then(r => r.data);
+          if (scheme?.id) {
+            const raw = await http.get(`/schemes/${scheme.id}/bonuses`).then(r => r.data.data);
+            bonusesData = (raw || []).filter(b => b.is_active);
+          }
+        }
+      } catch { /* silencioso */ }
+
+      setStats({ totalSales, prevSales, salesItems });
       setRuns(runsData);
+      setBonuses(bonusesData);
     } catch (e) {
       setError(e?.response?.data?.message || "Error al cargar datos");
     } finally { setLoading(false); }
@@ -792,6 +811,31 @@ function AdvisorDashboard() {
   const pendingRun  = runs.find((r) => r.status === "CALCULATED");
   const approvedRun = runs.find((r) => ["ADVISOR_APPROVED", "ASST_VALIDATED", "SENT_TO_HR"].includes(r.status));
   const selLabel    = `${MNLONG[selMonth]} ${selYear}`;
+  const prevLabel   = `${MN[prevM.month]} ${prevM.year}`;
+
+  // Datos para la gráfica comparativa mes actual vs anterior
+  const chartData = useMemo(() => [
+    { mes: prevLabel,   ventas: stats?.prevSales  ?? 0, fill: "#4a5568" },
+    { mes: selLabel,    ventas: stats?.totalSales ?? 0, fill: "#63b3ed" },
+  ], [stats, selLabel, prevLabel]);
+
+  // Parsear condiciones del bono para calcular progreso
+  const parsedBonuses = useMemo(() => {
+    return bonuses.map(b => {
+      let conditions = b.conditions;
+      if (typeof conditions === "string") {
+        try { conditions = JSON.parse(conditions); } catch { conditions = []; }
+      }
+      // Buscar la condición principal de unidades
+      const unitsCond = (conditions || []).find(c =>
+        ["MIN_TOTAL_UNITS", "UNITS_GREATER_EQUAL"].includes(c.type)
+      );
+      const target = unitsCond ? Number(unitsCond.value) : null;
+      const current = stats?.totalSales ?? 0;
+      const pct = target ? Math.min(100, Math.round((current / target) * 100)) : null;
+      return { ...b, target, current, pct, conditions };
+    }).filter(b => b.target !== null); // solo mostrar bonos con meta de unidades
+  }, [bonuses, stats]);
 
   if (loading) return <Stack alignItems="center" justifyContent="center" sx={{ minHeight: 400 }}><CircularProgress sx={{ color: "#63b3ed" }} /></Stack>;
   if (error)   return <Box sx={{ p: 2, borderRadius: 1.5, bgcolor: "rgba(252,129,129,0.08)", border: "1px solid", borderColor: "error.main" }}><Typography variant="body2" sx={{ color: "error.main" }}>{error}</Typography></Box>;
@@ -819,17 +863,121 @@ function AdvisorDashboard() {
           </Stack>
         </Stack>
 
-        {/* KPIs */}
+        {/* KPIs fila 1 */}
         <Grid container spacing={2}>
           {[
-            { title: "Mis ventas",        value: fmt(stats?.totalSales), subtitle: `Ventas de ${selLabel}`,   accent: "#63b3ed", icon: <DirectionsCarRoundedIcon fontSize="small" /> },
-            { title: "Mi comisión",       value: fmtM(totalComm),         subtitle: `Comisión de ${selLabel}`,       accent: "#f6ad55", icon: <PaymentsRoundedIcon fontSize="small" /> },
-            { title: "Comisiones emitidas", value: fmt(runs.length),      subtitle: `Emitidas en ${selLabel}`,       accent: "#68d391", icon: <ReceiptLongRoundedIcon fontSize="small" /> },
+            { title: "Mis ventas",          value: fmt(stats?.totalSales), subtitle: `Ventas de ${selLabel}`,    accent: "#63b3ed", icon: <DirectionsCarRoundedIcon fontSize="small" /> },
+            { title: "Mi comisión",         value: fmtM(totalComm),        subtitle: `Comisión de ${selLabel}`,  accent: "#f6ad55", icon: <PaymentsRoundedIcon fontSize="small" /> },
+            { title: "Comisiones emitidas", value: fmt(runs.length),       subtitle: `Emitidas en ${selLabel}`,  accent: "#68d391", icon: <ReceiptLongRoundedIcon fontSize="small" /> },
           ].map((k) => (
             <Grid key={k.title} size={{ xs: 12, sm: 4 }}>
               <KpiCard {...k} loading={false} pct={null} />
             </Grid>
           ))}
+        </Grid>
+
+        {/* Gráfica comparativa + Bonos */}
+        <Grid container spacing={2}>
+          {/* Gráfica mes actual vs anterior */}
+          <Grid size={{ xs: 12, md: parsedBonuses.length > 0 ? 6 : 12 }}>
+            <Card sx={{ borderRadius: 2, height: "100%" }}>
+              <CardContent>
+                <SectionTitle>Ventas: {selLabel} vs {prevLabel}</SectionTitle>
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={chartData} barSize={48}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                    <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "#aaa" }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: "#888" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+                    <RTooltip content={<CTooltip />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+                    <Bar dataKey="ventas" name="Ventas" radius={[6, 6, 0, 0]}>
+                      {chartData.map((d, i) => <Cell key={i} fill={d.fill} fillOpacity={i === 1 ? 1 : 0.5} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <Stack direction="row" justifyContent="center" spacing={3} sx={{ mt: 1 }}>
+                  {chartData.map((d, i) => (
+                    <Stack key={i} direction="row" spacing={0.75} alignItems="center">
+                      <Box sx={{ width: 10, height: 10, borderRadius: 1, bgcolor: d.fill, opacity: i === 1 ? 1 : 0.5 }} />
+                      <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: i === 1 ? 800 : 400 }}>
+                        {d.mes}: <b style={{ color: i === 1 ? "#63b3ed" : "#aaa" }}>{d.ventas}</b>
+                      </Typography>
+                    </Stack>
+                  ))}
+                  {stats?.totalSales > 0 && stats?.prevSales > 0 && (() => {
+                    const diff = stats.totalSales - stats.prevSales;
+                    const pct  = ((diff / stats.prevSales) * 100).toFixed(0);
+                    return (
+                      <Chip size="small"
+                        icon={diff >= 0 ? <TrendingUpRoundedIcon sx={{ fontSize: "0.75rem !important" }} /> : <TrendingDownRoundedIcon sx={{ fontSize: "0.75rem !important" }} />}
+                        label={`${diff >= 0 ? "+" : ""}${pct}%`}
+                        sx={{
+                          height: 18, fontSize: "0.62rem", fontWeight: 800,
+                          bgcolor: diff >= 0 ? "rgba(104,211,145,0.15)" : "rgba(252,129,129,0.15)",
+                          color:   diff >= 0 ? "#68d391" : "#fc8181",
+                          border: `1px solid ${diff >= 0 ? "rgba(104,211,145,0.3)" : "rgba(252,129,129,0.3)"}`,
+                          "& .MuiChip-icon": { color: diff >= 0 ? "#68d391" : "#fc8181", ml: "4px" },
+                        }}
+                      />
+                    );
+                  })()}
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Bonos activos */}
+          {parsedBonuses.length > 0 && (
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Card sx={{ borderRadius: 2, height: "100%" }}>
+                <CardContent>
+                  <SectionTitle>
+                    <Stack direction="row" spacing={1} alignItems="center" component="span">
+                      <EmojiEventsRoundedIcon sx={{ fontSize: 14, color: "#f6ad55" }} />
+                      <span>Bonos disponibles — {selLabel}</span>
+                    </Stack>
+                  </SectionTitle>
+                  <Stack spacing={2}>
+                    {parsedBonuses.map((b) => {
+                      const done    = b.pct >= 100;
+                      const color   = done ? "#68d391" : b.pct >= 60 ? "#f6ad55" : "#63b3ed";
+                      const faltán  = Math.max(0, b.target - b.current);
+                      return (
+                        <Box key={b.id} sx={{ p: 1.5, borderRadius: 1.5,
+                          bgcolor: done ? "rgba(104,211,145,0.06)" : "rgba(99,179,237,0.04)",
+                          border: `1px solid ${done ? "rgba(104,211,145,0.25)" : "rgba(99,179,237,0.15)"}` }}>
+                          <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1 }}>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 900, fontSize: "0.82rem" }} noWrap>{b.name}</Typography>
+                              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                                Meta: {b.target} unidades · Premio: <b style={{ color: "#68d391" }}>{fmtM(b.bonus_amount)}</b>
+                              </Typography>
+                            </Box>
+                            {done
+                              ? <Chip size="small" label="¡Logrado! 🎉" sx={{ fontWeight: 900, bgcolor: "rgba(104,211,145,0.15)", color: "#68d391", border: "1px solid rgba(104,211,145,0.3)" }} />
+                              : <Typography variant="body2" sx={{ fontWeight: 900, color, flexShrink: 0, ml: 1 }}>{b.pct}%</Typography>
+                            }
+                          </Stack>
+                          <LinearProgress variant="determinate" value={b.pct}
+                            sx={{ height: 6, borderRadius: 3, bgcolor: "action.hover",
+                              "& .MuiLinearProgress-bar": { borderRadius: 3, bgcolor: color } }} />
+                          <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
+                            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: "0.65rem" }}>
+                              {b.current} / {b.target} unidades
+                            </Typography>
+                            {!done && (
+                              <Typography variant="caption" sx={{ color, fontWeight: 700, fontSize: "0.65rem" }}>
+                                Faltan {faltán} unidad{faltán !== 1 ? "es" : ""}
+                              </Typography>
+                            )}
+                          </Stack>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                </CardContent>
+              </Card>
+            </Grid>
+          )}
         </Grid>
 
         {/* Nota de contexto */}

@@ -21,9 +21,11 @@
     "multer": "^2.0.2",
     "mysql2": "^3.16.1",
     "node-cron": "^4.2.1",
+    "nodemailer": "^8.0.3",
     "pdfkit": "^0.17.2",
     "sequelize": "^6.37.7",
     "winston": "^3.19.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.5"
   },
   "devDependencies": {

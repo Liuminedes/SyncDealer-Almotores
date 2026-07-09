@@ -9,9 +9,9 @@ import Users        from "../pages/users/Users";
 import Vehicles     from "../pages/vehicles/Vehicles";
 import Sales        from "../pages/sales/Sales";
 import Brands       from "../pages/brands/Brands";
+import Branches     from "../pages/branches/Branches";
 import BrandDetail  from "../pages/brands/BrandDetail";
 import Runs         from "../pages/commissions/Runs";
-import RunDetail    from "../pages/commissions/RunDetail";
 import Statements   from "../pages/commissions/Statements";
 import MyCommission from "../pages/advisor/MyCommission";
 import Exports      from "../pages/reports/Exports";
@@ -36,12 +36,21 @@ export const router = createBrowserRouter([
       // ── Admin + BrandOp ───────────────────────────────────────────────
       { path: "/vehicles",                  element: <Vehicles /> },
       { path: "/commissions/runs",          element: <Runs /> },
-      { path: "/commissions/runs/:id",      element: <RunDetail /> },
       { path: "/commissions/statements",    element: <Statements /> },
       { path: "/reports/exports",           element: <Exports /> },
       { path: "/users",                     element: <Users /> },
 
-      // ── Solo Admin ────────────────────────────────────────────────────
+
+      // ── Solo Admin ───────────────────────────────────────────────────
+      {
+        path: "/branches",
+        element: (
+          <ProtectedRoute requiredRole="ADMIN">
+            <Branches />
+          </ProtectedRoute>
+        ),
+      },
+      // ── Solo Admin (Marcas) ──────────────────────────────────────────
       {
         path: "/brands",
         element: (
@@ -51,9 +60,10 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        // /brands/:id accesible para ADMIN y brandOp (ProtectedRoute.canAccessRoute lo controla)
         path: "/brands/:id",
         element: (
-          <ProtectedRoute requiredRole="ADMIN">
+          <ProtectedRoute>
             <BrandDetail />
           </ProtectedRoute>
         ),

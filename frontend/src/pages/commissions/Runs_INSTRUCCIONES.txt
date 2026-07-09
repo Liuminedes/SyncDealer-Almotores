@@ -1,0 +1,51 @@
+// INSTRUCCIONES PARA INTEGRAR EN Runs.jsx
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. AGREGAR este import al inicio del archivo (junto a los otros imports):
+
+import BulkCalculateDialog from "./BulkCalculateDialog";
+import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
+
+// 2. AGREGAR al destructuring del store (junto a openCalculate):
+
+//   openBulkCalculate,
+
+// 3. REEMPLAZAR el bloque del Header (donde está el botón "Calcular comisión")
+//    con este:
+
+/*
+        <Stack direction="row" spacing={1}>
+          <Tooltip title="Refrescar">
+            <IconButton onClick={() => fetchRuns()}>
+              <RefreshRoundedIcon />
+            </IconButton>
+          </Tooltip>
+          <Button
+            onClick={openBulkCalculate}
+            variant="outlined"
+            startIcon={<AutorenewRoundedIcon />}
+            sx={{ borderRadius: 2, fontWeight: 700 }}>
+            Calcular todas
+          </Button>
+          <Button
+            onClick={openCalculate}
+            variant="contained"
+            startIcon={<AddRoundedIcon />}
+            sx={{ borderRadius: 2, fontWeight: 900 }}>
+            Calcular comisión
+          </Button>
+        </Stack>
+*/
+
+// 4. AGREGAR al final del JSX (antes del cierre del </Box> principal),
+//    junto a los otros dialogs:
+
+/*
+      <BulkCalculateDialog />
+*/
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESUMEN DE CAMBIOS:
+//   - Nuevo botón "Calcular todas" (outlined, con ícono de ciclo)
+//   - Nuevo dialog BulkCalculateDialog que maneja todo el flujo
+//   - El store ya tiene openBulkCalculate, startBulkCalculate, closeBulkCalc
+// ─────────────────────────────────────────────────────────────────────────────
