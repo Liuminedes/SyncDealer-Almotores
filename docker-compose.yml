@@ -29,8 +29,6 @@ services:
       MYSQL_PASSWORD:      ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
     networks:
       - syncdealer_net
     healthcheck:
