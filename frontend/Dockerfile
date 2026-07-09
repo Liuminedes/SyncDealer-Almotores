@@ -12,7 +12,8 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Instalar TODAS las dependencias (incluyendo devDeps necesarias para el build)
-RUN npm ci --ignore-scripts
+# Se usa --legacy-peer-deps para evitar conflictos entre versiones de MUI (ERESOLVE)
+RUN npm ci --legacy-peer-deps --ignore-scripts
 
 # Copiar código fuente
 COPY . .

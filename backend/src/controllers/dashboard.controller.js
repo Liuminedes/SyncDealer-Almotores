@@ -285,7 +285,7 @@ export async function getDashboardStats(req, res, next) {
       replacements: (() => {
         let m1 = thisMonth - 5, y1 = thisYear;
         if (m1 <= 0) { m1 += 12; y1 -= 1; }
-        return { y1, m1, y2: thisYear, m2: thisMonth };
+        return { y1, m1, y2: thisYear, m2: thisMonth, bid };
       })(),
     });
 

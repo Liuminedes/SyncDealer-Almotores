@@ -13,7 +13,7 @@ import brandConfigRoutes        from "./brand-config.routes.js";
 import schemeTiersRoutes        from "./scheme-tiers.routes.js";
 import percentageTiersRoutes    from "./percentageTiers.routes.js";
 import schemeRulesBonusesRoutes from "./scheme-rules-bonuses.routes.js";
-import advisorVacationsRoutes   from "./advisorVacations.routes.js";
+import advisorVacationsRoutes   from "./advisorvacations.routes.js";
 import dashboardRoutes          from "./dashboard.routes.js";
 import exportsRoutes            from "./exports.routes.js";
 
